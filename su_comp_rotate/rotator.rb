@@ -4,59 +4,48 @@ require 'sketchup.rb'
 
 module CustomTools
   module ComponentRotator
+    # Модуль с логикой дублирования и поворота компонентов/групп
     module Rotator
-      # Основная логика: Поворот (с созданием копии слева или на месте)
+      # Выполняет копирование слева (опционально) и поворот выделенных объектов вокруг осей Z и X
+      # @return [void]
       def self.rotate_selected
         model = Sketchup.active_model
-        selection = model.selection
+        # Фильтруем объекты: обрабатываем только компоненты и группы
+        targets = model.selection.select { |e| e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group) }
 
-        if selection.empty?
-          UI.messagebox('Пожалуйста, выделите компонент или группу.')
-          return
-        end
+        return UI.messagebox('Пожалуйста, выделите компонент или группу.') if targets.empty?
 
+        # Загрузка параметров из конфигурационного файла
         z_deg, x_deg, make_copy = Settings.get_settings
-
-        # Начинаем единую операцию для отмены через Ctrl+Z
         op_name = make_copy ? 'Копия слева и поворот Z-X' : 'Поворот Z-X'
+
+        # Единая операция для поддержки отмены одним шагом (Ctrl+Z)
         model.start_operation(op_name, true)
 
-        new_entities = []
+        new_items = targets.map do |ent|
+          # 1. При создании копии добавляем экземпляр в тот же контейнер и сдвигаем влево на габаритную ширину
+          target = if make_copy
+                     copy = ent.parent.entities.add_instance(ent.definition, ent.transformation)
+                     shift_left = Geom::Transformation.translation([-ent.bounds.width, 0, 0])
+                     copy.transform!(shift_left)
+                     copy
+                   else
+                     ent
+                   end
 
-        # Используем .to_a, чтобы не нарушать цикл при изменении выделения
-        selection.to_a.each do |ent|
-          next unless ent.is_a?(Sketchup::ComponentInstance) || ent.is_a?(Sketchup::Group)
+          # 2. Вычисляем поворот вокруг точки вставки: сначала вокруг Z, затем вокруг X
+          origin = target.transformation.origin
+          rot = Geom::Transformation.rotation(origin, X_AXIS, x_deg.degrees) *
+                Geom::Transformation.rotation(origin, Z_AXIS, z_deg.degrees)
+          target.transform!(rot)
 
-          if make_copy
-            # 1. Создаем копию объекта в том же контейнере (родительской группе/модели)
-            parent_entities = ent.parent.entities
-            copy = parent_entities.add_instance(ent.definition, ent.transformation)
-
-            # 2. Рассчитываем сдвиг влево (по оси -X) на габаритную ширину объекта
-            width = ent.bounds.width
-            shift_left = Geom::Vector3d.new(-width, 0, 0)
-            copy.transform!(Geom::Transformation.translation(shift_left))
-
-            # 3. Поворачиваем созданную копию вокруг её новой точки вставки
-            origin = copy.transformation.origin
-            tr_z = Geom::Transformation.rotation(origin, Z_AXIS, z_deg.degrees)
-            tr_x = Geom::Transformation.rotation(origin, X_AXIS, x_deg.degrees)
-            copy.transform!(tr_x * tr_z)
-
-            new_entities << copy
-          else
-            # Поворачиваем исходный объект на месте вокруг точки вставки
-            origin = ent.transformation.origin
-            tr_z = Geom::Transformation.rotation(origin, Z_AXIS, z_deg.degrees)
-            tr_x = Geom::Transformation.rotation(origin, X_AXIS, x_deg.degrees)
-            ent.transform!(tr_x * tr_z)
-          end
+          target
         end
 
         # При создании копий переносим выделение на новые повернутые объекты
-        if make_copy && !new_entities.empty?
-          selection.clear
-          selection.add(new_entities)
+        if make_copy && !new_items.empty?
+          model.selection.clear
+          model.selection.add(new_items)
         end
 
         model.commit_operation
