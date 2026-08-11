@@ -2,5 +2,5 @@
 make_copy: true
 angle_z: 35.0
 angle_x: 35.0
-side_view: Справа
+side_view: Слева
 offset: 20%

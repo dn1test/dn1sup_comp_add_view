@@ -26,10 +26,10 @@
 Проект организован в соответствии с официальными стандартами **SketchUp Developer Guidelines** и **RuboCop-SketchUp**:
 
 ```text
-su_comp_rotate/
+su_component_add_view/
 ├── README.md                          # Документация проекта
-├── su_comp_rotate.rb                  # Корневой регистратор SketchupExtension
-└── su_comp_rotate/                    # Папка модуля расширения
+├── su_component_add_view.rb           # Корневой регистратор SketchupExtension
+└── su_component_add_view/             # Папка модуля расширения
     ├── main.rb                        # Точка входа, команды, меню и панель инструментов
     ├── rotator.rb                     # Бизнес-логика дублирования, сдвига, вращения и проекций
     ├── settings.rb                    # Логика чтения/записи настроек и диалог параметров
@@ -46,17 +46,17 @@ su_comp_rotate/
 
 ### Вариант 1: Прямое копирование в папку Plugins
 
-1. Скопируйте файл `su_comp_rotate.rb` и папку `su_comp_rotate/` в директорию плагинов вашей версии SketchUp:
+1. Скопируйте файл `su_component_add_view.rb` и папку `su_component_add_view/` в директорию плагинов вашей версии SketchUp:
    - **Windows**: `%AppData%\SketchUp\SketchUp <Версия>\SketchUp\Plugins\`
    - **macOS**: `~/Library/Application Support/SketchUp <Версия>/SketchUp/Plugins/`
 2. Перезапустите SketchUp или загрузите файл через Ruby Console:
    ```ruby
-   load 'su_comp_rotate.rb'
+   load 'su_component_add_view.rb'
    ```
 
 ### Вариант 2: Упаковка в `.rbz` архив
 
-1. Выделите файл `su_comp_rotate.rb` и папку `su_comp_rotate/`.
+1. Выделите файл `su_component_add_view.rb` и папку `su_component_add_view/`.
 2. Запакуйте их в ZIP-архив.
 3. Переименуйте расширение архива с `.zip` на `.rbz` (например, `ComponentAddViews.rbz`).
 4. В SketchUp откройте: **Окно (Window) → Диспетчер расширений (Extension Manager) → Установить расширение (Install Extension)** и выберите созданный файл `.rbz`.
@@ -73,7 +73,7 @@ su_comp_rotate/
    - Копия вида сверху размещается сверху от объекта (+Z), а копия вида сбоку — справа (+X) с автоматическим адаптивным отступом.
 4. **Настройки**:
    - Откройте меню **Расширения → ComponentAddViews → Настройки...**
-   - В выпадающем списке выберите:
+   - В диалоговом окне настройте:
      - **Создавать копию слева** (`Да` / `Нет`).
      - **Углы поворота по осям Z и X** в градусах.
      - **Вид сбоку (проекция)** (`Справа` / `Слева`).
@@ -93,5 +93,6 @@ su_comp_rotate/
 - **Автор**: CustomTools
 - **Версия**: 1.1.0
 - **Год**: 2026
+
 
 

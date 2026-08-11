@@ -8,38 +8,66 @@ module CustomTools
     # Модуль управления параметрами плагина и работы с файлом конфигурации YAML
     module Settings
       CONFIG_FILE = File.join(__dir__, 'settings.yaml')
-      DEFAULTS = { 'make_copy' => true, 'angle_z' => 0.0, 'angle_x' => 0.0, 'side_view' => 'Справа', 'offset' => '20%' }.freeze
+      DEFAULTS = {
+        'make_copy' => true,
+        'angle_z' => 35.0,
+        'angle_x' => 35.0,
+        'side_view' => 'Справа',
+        'offset' => '20%'
+      }.freeze
 
       # Чтение параметров из YAML-файла с безопасными значениями по умолчанию
       # @return [Array(Float, Float, Boolean, String, String)] кортеж [угол_z, угол_x, флаг_копирования, вид_сбоку, отступ]
       def self.get_settings
-        data = File.exist?(CONFIG_FILE) ? YAML.safe_load(File.read(CONFIG_FILE, encoding: 'UTF-8')) : {}
-        data = DEFAULTS.merge(data.is_a?(Hash) ? data : {})
+        data = if File.exist?(CONFIG_FILE)
+                 raw = File.read(CONFIG_FILE, encoding: 'UTF-8')
+                 loaded = YAML.safe_load(raw)
+                 loaded.is_a?(Hash) ? loaded.transform_keys(&:to_s) : {}
+               else
+                 {}
+               end
+
+        data = DEFAULTS.merge(data)
         side = data['side_view'].to_s.strip
         side = 'Справа' unless %w[Справа Слева].include?(side)
         offset = data['offset'].to_s.strip
         offset = DEFAULTS['offset'] if offset.empty?
-        [data['angle_z'].to_f, data['angle_x'].to_f, data['make_copy'] != false, side, offset]
+
+        [
+          data['angle_z'].to_s.tr(',', '.').to_f,
+          data['angle_x'].to_s.tr(',', '.').to_f,
+          data['make_copy'] != false,
+          side,
+          offset
+        ]
       rescue StandardError => e
         warn "[ComponentAddViews] Ошибка чтения настроек: #{e.message}"
-        [DEFAULTS['angle_z'], DEFAULTS['angle_x'], DEFAULTS['make_copy'], DEFAULTS['side_view'], DEFAULTS['offset']]
+        [
+          DEFAULTS['angle_z'],
+          DEFAULTS['angle_x'],
+          DEFAULTS['make_copy'],
+          DEFAULTS['side_view'],
+          DEFAULTS['offset']
+        ]
       end
 
       # Сохранение настроек в YAML-файл
-      # @param [Numeric] z угол поворота по Z
-      # @param [Numeric] x угол поворота по X
+      # @param [Numeric, String] z угол поворота по Z
+      # @param [Numeric, String] x угол поворота по X
       # @param [Boolean] make_copy создавать ли копию слева
       # @param [String] side_view сторона вида сбоку ('Справа' или 'Слева')
       # @param [String, Numeric] offset отступ проекций (% от габарита или мм)
       # @return [void]
       def self.save_settings(z, x, make_copy = true, side_view = 'Справа', offset = '20%')
+        z_val = z.to_s.tr(',', '.').to_f
+        x_val = x.to_s.tr(',', '.').to_f
         offset_str = offset.to_s.strip
         offset_str = '20%' if offset_str.empty?
 
         data = {
           'make_copy' => !!make_copy,
-          'angle_z' => z.to_f,
-          'angle_x' => x.to_f,
+          'angle_z' => z_val,
+          'angle_x' => x_val,
           'side_view' => (side_view.to_s.strip == 'Слева' ? 'Слева' : 'Справа'),
           'offset' => offset_str
         }

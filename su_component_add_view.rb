@@ -8,7 +8,7 @@ module CustomTools
     unless file_loaded?(__FILE__)
       extension = SketchupExtension.new(
         'ComponentAddViews',
-        File.join('su_comp_rotate', 'main')
+        File.join('su_component_add_view', 'main')
       )
       extension.description = 'Создает копии компонентов и групп слева, поворачивает по осям Z и X, а также создает проекции вида сверху и сбоку.'
       extension.version     = '1.1.0'

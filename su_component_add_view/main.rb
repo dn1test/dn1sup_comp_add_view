@@ -37,10 +37,16 @@ module CustomTools
       toolbar = UI::Toolbar.new('ComponentAddViews')
       toolbar.add_item(cmd_rotate)
       toolbar.add_item(cmd_views)
-      toolbar.show
+
+      if toolbar.get_last_state == -1
+        toolbar.show
+      else
+        toolbar.restore
+      end
 
       file_loaded(__FILE__)
     end
   end
 end
+
 
