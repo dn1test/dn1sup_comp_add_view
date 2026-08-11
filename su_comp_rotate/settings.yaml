@@ -1,0 +1,4 @@
+# Настройки расширения Component Rotator
+make_copy: true
+angle_z: 35.0
+angle_x: 35.0
