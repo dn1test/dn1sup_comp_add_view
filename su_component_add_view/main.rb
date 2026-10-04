@@ -26,8 +26,14 @@ module CustomTools
         cmd.small_icon = cmd.large_icon = icon if File.exist?(icon)
       end
 
-      # Пункты в меню «Расширения» (Plugins)
-      menu = UI.menu('Plugins').add_submenu('ComponentAddViews')
+      # Общее подменю DN1SUP в меню «Расширения» — разделяется всеми расширениями DN1SUP.
+      # API не умеет искать существующие подменю по имени (add_submenu всегда создаёт новое),
+      # поэтому первое загрузившееся расширение создаёт подменю и кладёт его в $dn1sup_menu,
+      # а остальные переиспользуют.
+      dn1sup_menu = ($dn1sup_menu ||= UI.menu('Extensions').add_submenu('DN1SUP'))
+
+      # Пункты расширения — в подменю «Comp Add View» внутри DN1SUP
+      menu = dn1sup_menu.add_submenu('Comp Add View')
       menu.add_item(cmd_rotate)
       menu.add_item(cmd_views)
       menu.add_separator
