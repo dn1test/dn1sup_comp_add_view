@@ -28,9 +28,11 @@ module CustomTools
 
       # Общее подменю DN1SUP в меню «Расширения» — разделяется всеми расширениями DN1SUP.
       # API не умеет искать существующие подменю по имени (add_submenu всегда создаёт новое),
-      # поэтому первое загрузившееся расширение создаёт подменю и кладёт его в $dn1sup_menu,
-      # а остальные переиспользуют.
-      dn1sup_menu = ($dn1sup_menu ||= UI.menu('Extensions').add_submenu('DN1SUP'))
+      # поэтому первое загрузившееся расширение создаёт подменю и кладёт его в
+      # $dn1sup_common_menu (и в $dn1sup_menu — старое соглашение), а остальные переиспользуют.
+      dn1sup_menu = $dn1sup_common_menu || $dn1sup_menu
+      dn1sup_menu ||= UI.menu('Extensions').add_submenu('DN1SUP')
+      $dn1sup_common_menu = $dn1sup_menu = dn1sup_menu
 
       # Пункты расширения — в подменю «Comp Add View» внутри DN1SUP
       menu = dn1sup_menu.add_submenu('Comp Add View')

@@ -11,7 +11,7 @@ module CustomTools
         File.join('su_component_add_view', 'main')
       )
       extension.description = 'Создает копии компонентов и групп слева, поворачивает по осям Z и X, а также создает проекции вида сверху и сбоку.'
-      extension.version     = '1.2.0'
+      extension.version     = '1.3.0'
       extension.creator     = 'dn1codegen@gmail.com'
       extension.copyright   = 'DN1 2026 - dn1codegen'
 
