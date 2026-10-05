@@ -2,6 +2,15 @@
 
 require 'sketchup.rb'
 
+module Dn1sup
+  def self.common_menu
+    @common_menu ||= begin
+      legacy = (defined?($dn1sup_common_menu) && $dn1sup_common_menu) || (defined?($dn1sup_menu) && $dn1sup_menu)
+      legacy || UI.menu('Extensions').add_submenu('DN1SUP')
+    end
+  end
+end
+
 module CustomTools
   module ComponentAddViews
     # Подключение внутренних модулей настроек и логики поворота
@@ -29,10 +38,9 @@ module CustomTools
       # Общее подменю DN1SUP в меню «Расширения» — разделяется всеми расширениями DN1SUP.
       # API не умеет искать существующие подменю по имени (add_submenu всегда создаёт новое),
       # поэтому первое загрузившееся расширение создаёт подменю и кладёт его в
-      # $dn1sup_common_menu (и в $dn1sup_menu — старое соглашение), а остальные переиспользуют.
-      dn1sup_menu = $dn1sup_common_menu || $dn1sup_menu
-      dn1sup_menu ||= UI.menu('Extensions').add_submenu('DN1SUP')
-      $dn1sup_common_menu = $dn1sup_menu = dn1sup_menu
+      # Общее подменю DN1SUP в меню «Расширения» — синглтон в корневом модуле Dn1sup,
+      # разделяется всеми расширениями DN1SUP без глобальных переменных.
+      dn1sup_menu = Dn1sup.common_menu
 
       # Пункты расширения — в подменю «Comp Add View» внутри DN1SUP
       menu = dn1sup_menu.add_submenu('Comp Add View')
