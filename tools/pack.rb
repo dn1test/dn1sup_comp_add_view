@@ -16,10 +16,10 @@ require 'tmpdir'
 require 'zlib'
 
 CONFIG = {
-  id:         'dn1sup_create_project',
-  loader:     'dn1sup_create_project/dn1sup_create_project.rb',
-  dir:        'dn1sup_create_project/dn1sup_create_project',
-  target_dir: 'dn1sup_create_project'
+  id:         'dn1sup_comp_add_view',
+  loader:     'su_component_add_view.rb',
+  dir:        'su_component_add_view',
+  target_dir: 'dn1sup_comp_add_view'
 }.freeze
 
 EXCLUDE_FILES = %w[
@@ -131,4 +131,5 @@ Dir.mktmpdir do |tmp|
   write_zip(out, entries.sort_by(&:first))
   puts "Собран #{out} (v#{version}, файлов: #{entries.size})"
 end
+
 
