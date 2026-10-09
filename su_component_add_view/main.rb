@@ -2,6 +2,17 @@
 
 require 'sketchup.rb'
 
+# Общий модуль автообновления dn1sup_updater.rb кладётся в пакет при упаковке
+# (tools/pack.rb); в dev-копии его нет. LoadError не наследуется от
+# StandardError — ловим явно (SU2026+ пробрасывает).
+if defined?(Sketchup) && Sketchup.respond_to?(:require)
+  begin
+    Sketchup.require 'dn1sup_comp_add_view/dn1sup_updater'
+  rescue LoadError, StandardError
+    nil
+  end
+end
+
 module Dn1sup
   def self.common_menu
     @common_menu ||= begin
@@ -13,6 +24,14 @@ end
 
 module CustomTools
   module ComponentAddViews
+    VERSION  = '1.4.0'.freeze
+
+    ID       = 'dn1sup_comp_add_view'.freeze
+    REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
+    ASSET    = "#{ID}.rbz".freeze
+    PAGE_URL = "https://github.com/#{REPO}/releases".freeze
+    MANIFEST = { id: ID, repo: REPO, version: VERSION, asset: ASSET }.freeze
+
     # Подключение внутренних модулей настроек и логики поворота
     require_relative 'settings'
     require_relative 'rotator'
@@ -48,6 +67,15 @@ module CustomTools
       menu.add_item(cmd_views)
       menu.add_separator
       menu.add_item('Настройки...') { Settings.show_settings }
+      menu.add_separator
+      menu.add_item('Проверить обновления сейчас') do
+        if defined?(Dn1sup::Updater)
+          Dn1sup::Updater.check!(CustomTools::ComponentAddViews::MANIFEST.merge(force: true, async: true))
+        else
+          UI.openURL(CustomTools::ComponentAddViews::PAGE_URL)
+        end
+      end
+      menu.add_item('Страница релизов на GitHub') { UI.openURL(CustomTools::ComponentAddViews::PAGE_URL) }
 
       # Панель инструментов (Toolbar)
       toolbar = UI::Toolbar.new('DN1Sup Comp Add View')
@@ -58,6 +86,17 @@ module CustomTools
         toolbar.show
       else
         toolbar.restore
+      end
+
+      # Фоновая проверка обновлений один раз за сессию (не раньше 15 секунд,
+      # чтобы не мешать загрузке SketchUp).
+      unless $dn1sup_cav_update_check_scheduled
+        $dn1sup_cav_update_check_scheduled = true
+        if defined?(Dn1sup::Updater) && UI.respond_to?(:start_timer)
+          UI.start_timer(15, false) do
+            Dn1sup::Updater.check!(CustomTools::ComponentAddViews::MANIFEST.merge(async: true))
+          end
+        end
       end
 
       file_loaded(__FILE__)
