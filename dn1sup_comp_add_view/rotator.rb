@@ -14,11 +14,8 @@ module CustomTools
           copy = ent.copy
           copy.make_unique if copy.respond_to?(:make_unique)
           copy
-        elsif ent.respond_to?(:definition)
-          ent.parent.entities.add_instance(ent.definition, ent.transformation)
         else
-          ent_def = ent.entities.parent
-          ent.parent.entities.add_instance(ent_def, ent.transformation)
+          ent.parent.entities.add_instance(ent.definition, ent.transformation)
         end
       end
 

@@ -116,12 +116,7 @@ end
 |---|---|
 | Имя `dn1sup_*` в аккаунте `dn1test` | ✅ `dn1test/dn1sup_comp_add_view` |
 | Не archived | ✅ |
-| `registry.json` в корне `main` | ✅ (id, name, description, version 0.4.1) |
+| `registry.json` в корне `main` | ✅ (id, name, description, version 0.4.2) |
 | Стабильные релизы с `.rbz` | ✅ `dist/…rbz` через CI |
 | Теги `vMAJOR.MINOR.PATCH` | ✅ (workflow на `v*`) |
-| Регистратор `<id>.rb` + `ext.id` | ✅ `ext.id` задан; в архив кладётся `dn1sup_comp_add_view.rb` |
-
-В репозитории регистратор называется `su_component_add_view.rb`, но
-`tools/pack.rb` при сборке переименовывает его в `dn1sup_comp_add_view.rb`
-и правит путь к папке (проверено по `dist/dn1sup_comp_add_view-0.4.1.rbz`) —
-после установки в Plugins файл имеет правильное имя.
+| Регистратор `<id>.rb` + `ext.id` | ✅ `dn1sup_comp_add_view.rb` в корне репозитория (раньше назывался `su_component_add_view.rb` и переименовывался при сборке — теперь имена совпадают с `<id>` везде) |

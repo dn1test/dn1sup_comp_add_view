@@ -26,17 +26,16 @@
 Проект организован в соответствии с официальными стандартами **SketchUp Developer Guidelines** и **RuboCop-SketchUp**:
 
 ```text
-su_component_add_view/
+dn1sup_comp_add_view/
 ├── README.md                          # Документация проекта
-├── su_component_add_view.rb           # Корневой регистратор SketchupExtension
-└── su_component_add_view/             # Папка модуля расширения
+├── dn1sup_comp_add_view.rb           # Корневой регистратор SketchupExtension
+└── dn1sup_comp_add_view/             # Папка модуля расширения
     ├── main.rb                        # Точка входа, команды, меню и панель инструментов
     ├── rotator.rb                     # Бизнес-логика дублирования, сдвига, вращения и проекций
     ├── settings.rb                    # Логика чтения/записи настроек и диалог параметров
-    ├── settings.yaml                  # Конфигурационный файл настроек (YAML)
+    ├── settings.yaml                  # Локальные настройки (в .rbz не поставляется)
     └── resources/                     # Графические ресурсы
         ├── rotate.svg                 # Иконка создания копии и поворота
-        ├── settings.svg               # Иконка диалога настроек
         └── views.svg                  # Иконка создания копий вида сверху и сбоку
 ```
 
@@ -46,17 +45,17 @@ su_component_add_view/
 
 ### Вариант 1: Прямое копирование в папку Plugins
 
-1. Скопируйте файл `su_component_add_view.rb` и папку `su_component_add_view/` в директорию плагинов вашей версии SketchUp:
+1. Скопируйте файл `dn1sup_comp_add_view.rb` и папку `dn1sup_comp_add_view/` в директорию плагинов вашей версии SketchUp:
    - **Windows**: `%AppData%\SketchUp\SketchUp <Версия>\SketchUp\Plugins\`
    - **macOS**: `~/Library/Application Support/SketchUp <Версия>/SketchUp/Plugins/`
 2. Перезапустите SketchUp или загрузите файл через Ruby Console:
    ```ruby
-   load 'su_component_add_view.rb'
+   load 'dn1sup_comp_add_view.rb'
    ```
 
 ### Вариант 2: Упаковка в `.rbz` архив
 
-1. Выделите файл `su_component_add_view.rb` и папку `su_component_add_view/`.
+1. Выделите файл `dn1sup_comp_add_view.rb` и папку `dn1sup_comp_add_view/`.
 2. Запакуйте их в ZIP-архив.
 3. Переименуйте расширение архива с `.zip` на `.rbz` (например, `ComponentAddViews.rbz`).
 4. В SketchUp откройте: **Окно (Window) → Диспетчер расширений (Extension Manager) → Установить расширение (Install Extension)** и выберите созданный файл `.rbz`.
@@ -92,7 +91,7 @@ su_component_add_view/
 
 - **Автор**: DN1Sup <dn1codegen@gmail.com>
 - **Лицензия**: MIT — см. файл [LICENSE](LICENSE)
-- **Версия**: 0.4.1
+- **Версия**: 0.4.2
 - **Год**: 2026
 
 ---

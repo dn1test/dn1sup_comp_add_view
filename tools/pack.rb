@@ -17,14 +17,15 @@ require 'zlib'
 
 CONFIG = {
   id:         'dn1sup_comp_add_view',
-  loader:     'su_component_add_view.rb',
-  dir:        'su_component_add_view',
+  loader:     'dn1sup_comp_add_view.rb',
+  dir:        'dn1sup_comp_add_view',
   target_dir: 'dn1sup_comp_add_view'
 }.freeze
 
 EXCLUDE_FILES = %w[
   dev_updater.rb .sketchup_dev.json README.md README.MD
   .gitignore package.json package-lock.json CHANGELOG.md NOTES.md
+  settings.yaml
 ].map(&:downcase).freeze
 
 EXCLUDE_DIRS = %w[
@@ -127,8 +128,8 @@ Dir.mktmpdir do |tmp|
       if File.directory?(child)
         copy_dir.call(child, File.join(dst, name), rel_name)
       else
-        FileUtils.mkdir_p(File.join(dst, name))
-        FileUtils.cp(child, File.join(dst, name))
+        FileUtils.mkdir_p(dst)
+        FileUtils.cp(child, dst)
         entries << [File.join(target_dir_name, rel_name).tr('\\', '/'), File.binread(child)]
       end
     end

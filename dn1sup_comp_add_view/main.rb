@@ -15,16 +15,13 @@ end
 
 module Dn1sup
   def self.common_menu
-    @common_menu ||= begin
-      legacy = (defined?($dn1sup_common_menu) && $dn1sup_common_menu) || (defined?($dn1sup_menu) && $dn1sup_menu)
-      legacy || UI.menu('Extensions').add_submenu('DN1Sup')
-    end
+    @common_menu ||= UI.menu('Extensions').add_submenu('DN1Sup')
   end
 end
 
 module CustomTools
   module ComponentAddViews
-    VERSION  = '0.4.1'.freeze
+    VERSION  = '0.4.2'.freeze
 
     ID       = 'dn1sup_comp_add_view'.freeze
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
@@ -54,11 +51,9 @@ module CustomTools
         cmd.small_icon = cmd.large_icon = icon if File.exist?(icon)
       end
 
-      # Общее подменю DN1Sup в меню «Расширения» — разделяется всеми расширениями DN1Sup.
-      # API не умеет искать существующие подменю по имени (add_submenu всегда создаёт новое),
-      # поэтому первое загрузившееся расширение создаёт подменю и кладёт его в
       # Общее подменю DN1Sup в меню «Расширения» — синглтон в корневом модуле Dn1sup,
-      # разделяется всеми расширениями DN1Sup без глобальных переменных.
+      # разделяется всеми расширениями DN1Sup (API не умеет искать существующие
+      # подменю по имени — add_submenu всегда создаёт новое).
       dn1sup_menu = Dn1sup.common_menu
 
       # Пункты расширения — в подменю «Comp Add View» внутри DN1Sup
