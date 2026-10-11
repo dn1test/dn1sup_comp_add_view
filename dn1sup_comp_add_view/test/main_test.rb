@@ -44,11 +44,31 @@ module CustomTools
         assert(Settings.respond_to?(:save_settings), 'нет Settings.save_settings')
       end
 
-      test 'иконки ресурсов на месте' do
-        %w[rotate.svg views.svg].each do |name|
-          path = File.join(__dir__, '..', 'resources', name)
-          assert(File.file?(path), "нет иконки #{path}")
+      test 'иконка кнопки панели на месте' do
+        path = File.join(__dir__, '..', 'resources', 'panel.svg')
+        assert(File.file?(path), "нет иконки #{path}")
+      end
+
+      test 'панель: API модуля Panel' do
+        assert(Panel.respond_to?(:show), 'нет Panel.show')
+        assert(Panel.respond_to?(:selection_info), 'нет Panel.selection_info')
+        assert(Panel.respond_to?(:settings_hash), 'нет Panel.settings_hash')
+        assert(Panel.respond_to?(:push_selection), 'нет Panel.push_selection')
+      end
+
+      test 'панель: settings_hash содержит ключи интерфейса' do
+        h = Panel.settings_hash
+        %i[angle_z angle_x make_copy side_view offset version].each do |k|
+          assert(h.key?(k), "нет ключа #{k}")
         end
+      end
+
+      test 'панель: resources/panel.html собран и содержит корень Vue' do
+        html = File.join(__dir__, '..', 'resources', 'panel.html')
+        assert(File.file?(html), "нет собранной панели #{html}")
+        content = File.read(html, encoding: 'UTF-8')
+        assert(content.include?('id="app"'), 'panel.html без корня монтирования Vue (#app)')
+        assert(content.bytesize > 50_000, 'panel.html подозрительно мал — бандл не встроен')
       end
 
       test 'настройки читаются кортежем из 5 значений' do

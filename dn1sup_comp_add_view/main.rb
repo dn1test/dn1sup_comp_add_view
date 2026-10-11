@@ -21,7 +21,7 @@ end
 
 module CustomTools
   module ComponentAddViews
-    VERSION  = '0.4.2'.freeze
+    VERSION  = '0.5.0'.freeze
 
     ID       = 'dn1sup_comp_add_view'.freeze
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
@@ -29,25 +29,20 @@ module CustomTools
     PAGE_URL = "https://github.com/#{REPO}/releases".freeze
     MANIFEST = { id: ID, repo: REPO, version: VERSION, asset: ASSET }.freeze
 
-    # Подключение внутренних модулей настроек и логики поворота
+    # Подключение внутренних модулей настроек, логики поворота и панели
     require_relative 'settings'
     require_relative 'rotator'
+    require_relative 'dialog'
 
     # Регистрация элементов пользовательского интерфейса (меню и тулбар)
     unless file_loaded?(__FILE__)
-      # Создание команды поворота и настройка её параметров (подсказки, иконки)
-      cmd_rotate = UI::Command.new('Повернуть') { Rotator.rotate_selected }.tap do |cmd|
-        cmd.tooltip = 'Повернуть по Z и X'
-        cmd.status_bar_text = 'Поворачивает объект (или создает копию слева) по осям Z и X'
-        icon = File.join(__dir__, 'resources', 'rotate.svg')
-        cmd.small_icon = cmd.large_icon = icon if File.exist?(icon)
-      end
-
-      # Создание команды создания 2 копий: вид сверху и вид сбоку
-      cmd_views = UI::Command.new('Вид сверху и сбоку') { Rotator.create_top_side_views }.tap do |cmd|
-        cmd.tooltip = 'Создать 2 копии: вид сверху и сбоку'
-        cmd.status_bar_text = 'Создает две повернутые копии выделенного объекта (вид сверху и вид сбоку)'
-        icon = File.join(__dir__, 'resources', 'views.svg')
+      # Единственная команда тулбара — открытие панели управления (HtmlDialog
+      # на Vue 3 + Tailwind): операции и настройки живут только в панели,
+      # старые кнопки «Повернуть» / «Вид сверху и сбоку» заменены ею
+      cmd_panel = UI::Command.new('Панель Comp Add View') { Panel.show }.tap do |cmd|
+        cmd.tooltip = 'Панель Comp Add View'
+        cmd.status_bar_text = 'Открывает панель управления: поворот, проекции, настройки и предпросмотр'
+        icon = File.join(__dir__, 'resources', 'panel.svg')
         cmd.small_icon = cmd.large_icon = icon if File.exist?(icon)
       end
 
@@ -58,10 +53,8 @@ module CustomTools
 
       # Пункты расширения — в подменю «Comp Add View» внутри DN1Sup
       menu = dn1sup_menu.add_submenu('Comp Add View')
-      menu.add_item(cmd_rotate)
-      menu.add_item(cmd_views)
-      menu.add_separator
-      menu.add_item('Настройки...') { Settings.show_settings }
+      menu.add_item(cmd_panel)
+      menu.add_item('Настройки...') { Panel.show }
       menu.add_separator
       menu.add_item('Проверить обновления сейчас') do
         if defined?(Dn1sup::Updater)
@@ -72,10 +65,9 @@ module CustomTools
       end
       menu.add_item('Страница релизов на GitHub') { UI.openURL(CustomTools::ComponentAddViews::PAGE_URL) }
 
-      # Панель инструментов (Toolbar)
+      # Панель инструментов — одна кнопка открытия панели
       toolbar = UI::Toolbar.new('DN1Sup Comp Add View')
-      toolbar.add_item(cmd_rotate)
-      toolbar.add_item(cmd_views)
+      toolbar.add_item(cmd_panel)
 
       if toolbar.get_last_state == -1
         toolbar.show
