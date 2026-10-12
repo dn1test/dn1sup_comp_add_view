@@ -81,8 +81,28 @@ module CustomTools
                      model.selection.respond_to?(:add_observer)
         assert(can_attach, 'ни типового (add_selection_observer), ни единого (Selection#add_observer) способа')
 
-        Panel.send(:attach_selection_observer)
+        assert_equal(true, Panel.send(:attach_selection_observer),
+                     'attach не смог приаттачить наблюдателя выделения')
         Panel.send(:detach_observers)
+      end
+
+      # Живой тест: selection_info различает всего выделенное (total) и цели
+      # операций — компоненты/группы (targets); на них гейтится кнопка «Применить»
+      test 'панель: selection_info считает компоненты и группы целями' do
+        skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
+
+        model = Sketchup.active_model
+        group = model.entities.add_group
+        group.entities.add_face([0, 0, 0], [10.mm, 0, 0], [10.mm, 10.mm, 0], [0, 10.mm, 0])
+        begin
+          model.selection.add(group)
+          info = Panel.selection_info
+          assert(info[:total] >= 1, 'total не учитывает выделенную группу')
+          assert(info[:targets] >= 1, 'targets не видит группу — кнопки панели останутся неактивными')
+        ensure
+          model.selection.clear
+          group.erase! if group.valid?
+        end
       end
 
       test 'панель: settings_hash содержит ключи интерфейса' do

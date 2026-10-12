@@ -145,40 +145,83 @@ module CustomTools
         end
 
         # Любое изменение выделения: предпросмотр переносится на новое
-        # выделение (если был активен) либо снимается; состояние уходит в панель
+        # выделение (если был активен) либо снимается; состояние уходит в панель.
+        #
+        # Тело откладывается в одноразовый таймер (с коалесценцией пачки
+        # событий bulk+added/removed): SU2026.2 (Qt WebEngine) молча теряет
+        # execute_script, вызванный синхронно из колбэка наблюдателя, — пуш
+        # из контекста таймера доходит. Заодно abort_operation предпросмотра
+        # (откатывающий выделение) перестаёт реентерабельно дёргать наблюдателя.
         def selection_changed
-          was_active = Preview.active?
-          Preview.cancel
-          Preview.refresh if was_active
-          push_selection
+          return if @selection_timer
+
+          @selection_timer = UI.start_timer(0.05, false) do
+            @selection_timer = nil
+            was_active = Preview.active?
+            Preview.cancel
+            Preview.refresh if was_active
+            push_selection
+          end
         end
 
         # SketchUp 2026.2 удалил типовые методы наблюдателей
         # (add_selection_observer, add_tools_observer, …) — остался единый
         # add_observer/remove_observer на коллекциях (model.selection, model.tools)
         # с теми же именами колбэков; в старых версиях работают типовые методы.
+        # Возвращает true, только если наблюдатель выделения реально приаттачен;
+        # при неудаче @observer сбрасывается — следующее открытие панели
+        # повторит попытку.
+        # @return [Boolean]
         def attach_selection_observer
-          return if !defined?(Sketchup::SelectionObserver) || @observer
+          return true if @observer
+          return false unless defined?(Sketchup::SelectionObserver)
 
           model = Sketchup.active_model
           @observer = SelectionObserver.new
-          if model.respond_to?(:add_selection_observer)
-            model.add_selection_observer(@observer)
-          elsif model.selection.respond_to?(:add_observer)
-            model.selection.add_observer(@observer)
+          attached =
+            if model.respond_to?(:add_selection_observer)
+              !model.add_selection_observer(@observer).equal?(false)
+            elsif model.selection.respond_to?(:add_observer)
+              !model.selection.add_observer(@observer).equal?(false)
+            else
+              false
+            end
+          unless attached
+            warn "[ComponentAddViews] Не удалось приаттачить наблюдатель выделения (SketchUp #{Sketchup.version}) — панель будет обновлять выделение опросом"
+            @observer = nil
+            return false
           end
+
+          attach_tools_observer(model)
+          true
+        end
+
+        # Наблюдатель инструментов необязателен: без него предпросмотр просто
+        # не снимается сам при смене инструмента
+        def attach_tools_observer(model)
           return unless defined?(Sketchup::ToolsObserver)
 
           tools = model.tools
           @tools_observer = ToolsObserver.new
-          if tools.respond_to?(:add_tools_observer)
-            tools.add_tools_observer(@tools_observer)
-          elsif tools.respond_to?(:add_observer)
-            tools.add_observer(@tools_observer)
-          end
+          attached =
+            if tools.respond_to?(:add_tools_observer)
+              !tools.add_tools_observer(@tools_observer).equal?(false)
+            elsif tools.respond_to?(:add_observer)
+              !tools.add_observer(@tools_observer).equal?(false)
+            else
+              false
+            end
+          return if attached
+
+          warn '[ComponentAddViews] Наблюдатель инструментов не приаттачен — предпросмотр не снимается при смене инструмента'
+          @tools_observer = nil
         end
 
         def detach_observers
+          if @selection_timer
+            UI.stop_timer(@selection_timer)
+            @selection_timer = nil
+          end
           return unless @observer
 
           model = Sketchup.active_model

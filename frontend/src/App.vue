@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { callRuby, onEvent } from './bridge.js'
 import SectionBlock from './components/SectionBlock.vue'
 import RotateParams from './components/RotateParams.vue'
@@ -26,11 +26,12 @@ let toastTimer = null
 let ready = false
 
 const hasTargets = computed(() => selection.value.targets > 0)
-const selectionText = computed(() =>
-  hasTargets.value
-    ? `Выделено объектов: ${selection.value.targets} — предпросмотр и операции доступны`
-    : 'Выделите компонент или группу в модели'
-)
+const selectionText = computed(() => {
+  const { total, targets } = selection.value
+  if (targets > 0) return `Выделено объектов: ${targets} — предпросмотр и операции доступны`
+  if (total > 0) return `Выделено: ${total}, но среди них нет компонентов или групп — выделите компонент или группу`
+  return 'Выделите компонент или группу в модели'
+})
 
 function normalize(raw) {
   const s = raw && typeof raw === 'object' ? raw : {}
@@ -71,6 +72,23 @@ async function refreshSelection() {
     if (info && typeof info === 'object') selection.value = info
   } catch {
     /* мост недоступен — остаётся последнее состояние */
+  }
+}
+
+// Страховочный опрос выделения: push от SelectionObserver — основной канал,
+// но SU2026 (Qt WebEngine) может терять execute_script из колбэков наблюдателя.
+// Опрос гарантирует, что индикатор и кнопки придут в актуальное состояние,
+// даже если пуш-событие не дошло. Защита от наложения — один запрос за раз.
+const POLL_MS = 1200
+let pollTimer = null
+let pollInFlight = false
+async function pollSelection() {
+  if (pollInFlight || document.visibilityState !== 'visible') return
+  pollInFlight = true
+  try {
+    await refreshSelection()
+  } finally {
+    pollInFlight = false
   }
 }
 
@@ -157,6 +175,15 @@ onMounted(async () => {
   }
   ready = true
   refreshSelection()
+  pollTimer = setInterval(pollSelection, POLL_MS)
+  window.addEventListener('focus', pollSelection)
+  document.addEventListener('visibilitychange', pollSelection)
+})
+
+onUnmounted(() => {
+  clearInterval(pollTimer)
+  window.removeEventListener('focus', pollSelection)
+  document.removeEventListener('visibilitychange', pollSelection)
 })
 </script>
 
