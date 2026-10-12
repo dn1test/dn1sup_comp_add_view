@@ -8,7 +8,7 @@
 // сохранён фолбэк на callRuby/call_ruby. Вне SketchUp (предпросмотр HTML
 // в браузере) мост отвечает мок-данными.
 
-const MOCK_VERSION = '0.6.0'
+const MOCK_VERSION = '0.6.1'
 
 const mockState = {
   angle_z: 35,

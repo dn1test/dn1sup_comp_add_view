@@ -69,6 +69,22 @@ module CustomTools
         assert(Panel.respond_to?(:push_selection), 'нет Panel.push_selection')
       end
 
+      # Регрессия SU2026.2: типовые методы наблюдателей удалены
+      # (add_selection_observer и т.п.) — attach обязан ставить наблюдателя
+      # через единый add_observer и не падать. Тест живой: выполняется внутри
+      # SketchUp, вне его уходит в skip.
+      test 'панель: attach/detach наблюдателей работают на этой версии API' do
+        skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
+
+        model = Sketchup.active_model
+        can_attach = model.respond_to?(:add_selection_observer) ||
+                     model.selection.respond_to?(:add_observer)
+        assert(can_attach, 'ни типового (add_selection_observer), ни единого (Selection#add_observer) способа')
+
+        Panel.send(:attach_selection_observer)
+        Panel.send(:detach_observers)
+      end
+
       test 'панель: settings_hash содержит ключи интерфейса' do
         h = Panel.settings_hash
         %i[angle_z angle_x make_copy side_view offset version].each do |k|

@@ -153,25 +153,47 @@ module CustomTools
           push_selection
         end
 
+        # SketchUp 2026.2 удалил типовые методы наблюдателей
+        # (add_selection_observer, add_tools_observer, …) — остался единый
+        # add_observer/remove_observer на коллекциях (model.selection, model.tools)
+        # с теми же именами колбэков; в старых версиях работают типовые методы.
         def attach_selection_observer
           return if !defined?(Sketchup::SelectionObserver) || @observer
 
+          model = Sketchup.active_model
           @observer = SelectionObserver.new
-          Sketchup.active_model.add_selection_observer(@observer)
-          if defined?(Sketchup::ToolsObserver)
-            @tools_observer = ToolsObserver.new
-            Sketchup.active_model.tools.add_tools_observer(@tools_observer)
+          if model.respond_to?(:add_selection_observer)
+            model.add_selection_observer(@observer)
+          elsif model.selection.respond_to?(:add_observer)
+            model.selection.add_observer(@observer)
+          end
+          return unless defined?(Sketchup::ToolsObserver)
+
+          tools = model.tools
+          @tools_observer = ToolsObserver.new
+          if tools.respond_to?(:add_tools_observer)
+            tools.add_tools_observer(@tools_observer)
+          elsif tools.respond_to?(:add_observer)
+            tools.add_observer(@tools_observer)
           end
         end
 
         def detach_observers
           return unless @observer
 
-          if defined?(Sketchup::SelectionObserver)
-            Sketchup.active_model.remove_selection_observer(@observer)
+          model = Sketchup.active_model
+          if model.respond_to?(:remove_selection_observer)
+            model.remove_selection_observer(@observer)
+          elsif model.selection.respond_to?(:remove_observer)
+            model.selection.remove_observer(@observer)
           end
           if @tools_observer && defined?(Sketchup::ToolsObserver)
-            Sketchup.active_model.tools.remove_tools_observer(@tools_observer)
+            tools = model.tools
+            if tools.respond_to?(:remove_tools_observer)
+              tools.remove_tools_observer(@tools_observer)
+            elsif tools.respond_to?(:remove_observer)
+              tools.remove_observer(@tools_observer)
+            end
           end
           @observer = nil
           @tools_observer = nil
