@@ -45,6 +45,24 @@ module CustomTools
           nil
         end
 
+        # Закрытие панели при выгрузке неймспейса (переключение канала dev/prod,
+        # unload!): окно закрывается (set_on_closed снимает наблюдатели и
+        # предпросмотр), ссылка забывается — следующий show создаст свежий диалог.
+        # @return [Boolean]
+        def close_all
+          return false unless @dialog
+
+          begin
+            @dialog.close if @dialog.visible?
+          rescue StandardError
+            nil
+          end
+          detach_observers
+          Preview.cancel
+          @dialog = nil
+          true
+        end
+
         # Снимок выделения: сколько всего выделено и сколько подходит
         # (компоненты/группы — целевые объекты операций)
         # @return [Hash{Symbol => Integer}]

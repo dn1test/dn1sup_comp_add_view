@@ -21,7 +21,7 @@ end
 
 module CustomTools
   module ComponentAddViews
-    VERSION  = '0.6.2'.freeze
+    VERSION  = '0.6.3'.freeze
 
     ID       = 'dn1sup_comp_add_view'.freeze
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
@@ -34,6 +34,25 @@ module CustomTools
     require_relative 'rotator'
     require_relative 'preview'
     require_relative 'dialog'
+
+    # Выгрузка неймспейса при переключении канала dev/prod (dn1sup_ext_manager,
+    # метод switch_extension): остановка таймера проверки обновлений, закрытие
+    # панели, скрытие тулбара. Меню через SketchUp API не удаляются — пункты
+    # старого канала остаются до перезапуска SketchUp (известное ограничение).
+    # @return [Boolean]
+    def self.unload!
+      if defined?(UI) && UI.respond_to?(:stop_timer) && @update_timer_id
+        UI.stop_timer(@update_timer_id)
+        @update_timer_id = nil
+      end
+      Panel.close_all if defined?(Panel) && Panel.respond_to?(:close_all)
+      toolbar = UI::Toolbar.new('DN1Sup Comp Add View') if defined?(UI)
+      toolbar.hide if toolbar.respond_to?(:visible?) && toolbar.visible?
+      true
+    rescue StandardError => e
+      warn "[ComponentAddViews] unload!: #{e.message}"
+      false
+    end
 
     # Регистрация элементов пользовательского интерфейса (меню и тулбар)
     unless file_loaded?(__FILE__)
@@ -81,7 +100,9 @@ module CustomTools
       unless $dn1sup_cav_update_check_scheduled
         $dn1sup_cav_update_check_scheduled = true
         if defined?(Dn1sup::Updater) && UI.respond_to?(:start_timer)
-          UI.start_timer(15, false) do
+          # id таймера хранится в ivar неймспейса: unload! останавливает его
+          # при переключении канала, иначе таймер переживёт remove_const.
+          @update_timer_id = UI.start_timer(15, false) do
             Dn1sup::Updater.check!(CustomTools::ComponentAddViews::MANIFEST.merge(async: true))
           end
         end
