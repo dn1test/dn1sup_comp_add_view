@@ -44,6 +44,19 @@ module CustomTools
         assert(Settings.respond_to?(:save_settings), 'нет Settings.save_settings')
       end
 
+      test 'предпросмотр: API и cancel безопасен без активного предпросмотра' do
+        assert(Preview.respond_to?(:update), 'нет Preview.update')
+        assert(Preview.respond_to?(:apply), 'нет Preview.apply')
+        assert(Preview.respond_to?(:cancel), 'нет Preview.cancel')
+        assert(Preview.respond_to?(:refresh), 'нет Preview.refresh')
+        assert(Preview.respond_to?(:active?), 'нет Preview.active?')
+
+        # Без выделения/открытой операции cancel обязан отработать без ошибок
+        # и вернуть false
+        assert_equal(false, Preview.cancel, 'cancel без предпросмотра должен вернуть false')
+        assert_equal(false, Preview.active?)
+      end
+
       test 'иконка кнопки панели на месте' do
         path = File.join(__dir__, '..', 'resources', 'panel.svg')
         assert(File.file?(path), "нет иконки #{path}")

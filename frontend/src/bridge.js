@@ -8,7 +8,7 @@
 // сохранён фолбэк на callRuby/call_ruby. Вне SketchUp (предпросмотр HTML
 // в браузере) мост отвечает мок-данными.
 
-const MOCK_VERSION = '0.5.0'
+const MOCK_VERSION = '0.6.0'
 
 const mockState = {
   angle_z: 35,
@@ -112,6 +112,16 @@ function mockCall(action, payload) {
     }
     case 'selection_info':
       return { ...mockState.selection }
+    // Вне SketchUp живого 3D-предпросмотра нет — отвечаем состоянием панели
+    case 'preview_update':
+    case 'preview_views_update':
+      return { preview: mockState.selection.targets > 0 }
+    case 'preview_apply':
+      return { action: 'rotate' }
+    case 'preview_views_apply':
+      return { action: 'views' }
+    case 'preview_cancel':
+      return null
     default:
       return null
   }

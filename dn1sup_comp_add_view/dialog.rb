@@ -95,16 +95,32 @@ module CustomTools
           dlg.add_action_callback('settings_get') { |_ctx, req_id| push_event('result', id: req_id, payload: settings_hash) }
           dlg.add_action_callback('settings_save') { |_ctx, req_id, params| push_event('result', id: req_id, payload: save_from_panel(params)) }
           dlg.add_action_callback('selection_info') { |_ctx, req_id| push_event('result', id: req_id, payload: selection_info) }
-          dlg.add_action_callback('rotate') do |_ctx, req_id, _params|
-            run_action(:rotate_selected)
+          # Предпросмотры: JS шлёт их при каждом изменении параметров (с дебаунсом),
+          # «Применить» в панели закрепляет результат обычной операцией Rotator
+          dlg.add_action_callback('preview_update') { |_ctx, req_id, params|
+            Preview.update(:rotate, params)
+            push_event('result', id: req_id, payload: { preview: Preview.active? })
+          }
+          dlg.add_action_callback('preview_views_update') { |_ctx, req_id, params|
+            Preview.update(:views, params)
+            push_event('result', id: req_id, payload: { preview: Preview.active? })
+          }
+          dlg.add_action_callback('preview_apply') { |_ctx, req_id, params|
+            Preview.apply(:rotate, params)
+            push_selection
             push_event('result', id: req_id, payload: { action: 'rotate' })
-          end
-          dlg.add_action_callback('views') do |_ctx, req_id, _params|
-            run_action(:create_top_side_views)
+          }
+          dlg.add_action_callback('preview_views_apply') { |_ctx, req_id, params|
+            Preview.apply(:views, params)
+            push_selection
             push_event('result', id: req_id, payload: { action: 'views' })
-          end
+          }
+          dlg.add_action_callback('preview_cancel') { |_ctx, _req_id| Preview.cancel }
           dlg.add_action_callback('open_releases') { UI.openURL(PAGE_URL) }
-          dlg.set_on_closed { detach_selection_observer }
+          dlg.set_on_closed do
+            Preview.cancel
+            detach_observers
+          end
           dlg
         end
 
@@ -128,41 +144,70 @@ module CustomTools
           push_selection
         end
 
+        # Любое изменение выделения: предпросмотр переносится на новое
+        # выделение (если был активен) либо снимается; состояние уходит в панель
+        def selection_changed
+          was_active = Preview.active?
+          Preview.cancel
+          Preview.refresh if was_active
+          push_selection
+        end
+
         def attach_selection_observer
           return if !defined?(Sketchup::SelectionObserver) || @observer
 
           @observer = SelectionObserver.new
           Sketchup.active_model.add_selection_observer(@observer)
+          if defined?(Sketchup::ToolsObserver)
+            @tools_observer = ToolsObserver.new
+            Sketchup.active_model.tools.add_tools_observer(@tools_observer)
+          end
         end
 
-        def detach_selection_observer
+        def detach_observers
           return unless @observer
 
           if defined?(Sketchup::SelectionObserver)
             Sketchup.active_model.remove_selection_observer(@observer)
           end
+          if @tools_observer && defined?(Sketchup::ToolsObserver)
+            Sketchup.active_model.tools.remove_tools_observer(@tools_observer)
+          end
           @observer = nil
+          @tools_observer = nil
         end
       end
 
       # Наблюдатель выделения: пока панель открыта, любое изменение выделения
-      # в модели обновляет индикатор панели без опроса со стороны JS.
+      # в модели обновляет индикатор панели и переносит/снимает предпросмотр
+      # без опроса со стороны JS.
       if defined?(Sketchup::SelectionObserver)
         class SelectionObserver
           def onSelectionBulkChange(_selection)
-            Panel.push_selection
+            Panel.selection_changed
           end
 
           def onSelectionAdded(_a, _entity)
-            Panel.push_selection
+            Panel.selection_changed
           end
 
           def onSelectionRemoved(_a, _entity)
-            Panel.push_selection
+            Panel.selection_changed
           end
 
           def onSelectionCleared(_selection)
-            Panel.push_selection
+            Panel.selection_changed
+          end
+        end
+      end
+
+      # Наблюдатель инструмента: пользователь ушёл работать в модель вручную —
+      # открытая операция предпросмотра снимается, чтобы не поглотить его правки
+      # (см. комментарий модуля Preview).
+      if defined?(Sketchup::ToolsObserver)
+        class ToolsObserver
+          def onActiveToolChanged(_tools, _tool_name, _tool_id)
+            Preview.cancel
           end
         end
       end

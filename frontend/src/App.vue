@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { callRuby, onEvent } from './bridge.js'
-import ActionCard from './components/ActionCard.vue'
+import SectionBlock from './components/SectionBlock.vue'
+import RotateParams from './components/RotateParams.vue'
+import ViewsParams from './components/ViewsParams.vue'
 import SchemeRotate from './components/SchemeRotate.vue'
 import SchemeViews from './components/SchemeViews.vue'
-import SettingsForm from './components/SettingsForm.vue'
 
 const DEFAULTS = Object.freeze({
   angle_z: 35,
@@ -15,20 +16,21 @@ const DEFAULTS = Object.freeze({
 })
 
 const version = ref('')
-const applied = ref({ ...DEFAULTS })
-const draft = ref({ ...DEFAULTS })
+const settings = ref({ ...DEFAULTS })
 const selection = ref({ total: 0, targets: 0 })
-const busy = reactive({ rotate: false, views: false, save: false })
+const busy = reactive({ rotate: false, views: false })
 const toast = ref('')
 let toastTimer = null
+// Настройки грузятся асинхронно — до загрузки наблюдатели молчат,
+// чтобы не сохранять/предпросматривать значения по умолчанию
+let ready = false
 
 const hasTargets = computed(() => selection.value.targets > 0)
 const selectionText = computed(() =>
   hasTargets.value
-    ? `Выделено объектов: ${selection.value.targets} — операции доступны`
+    ? `Выделено объектов: ${selection.value.targets} — предпросмотр и операции доступны`
     : 'Выделите компонент или группу в модели'
 )
-const dirty = computed(() => JSON.stringify(normalize(draft.value)) !== JSON.stringify(normalize(applied.value)))
 
 function normalize(raw) {
   const s = raw && typeof raw === 'object' ? raw : {}
@@ -55,6 +57,14 @@ function showToast(text) {
   }, 2600)
 }
 
+function debounce(fn, ms) {
+  let t = null
+  return (...args) => {
+    clearTimeout(t)
+    t = setTimeout(() => fn(...args), ms)
+  }
+}
+
 async function refreshSelection() {
   try {
     const info = await callRuby('selection_info')
@@ -64,12 +74,53 @@ async function refreshSelection() {
   }
 }
 
-async function doRotate() {
+// Настройки применяются сразу: любое изменение тихо сохраняется в Ruby
+// (ошибка — только тост), а параметры блоков обновляют живой 3D-предпросмотр
+const saveSettings = debounce(async () => {
+  try {
+    await callRuby('settings_save', normalize(settings.value))
+  } catch (e) {
+    showToast(`Не сохранено: ${(e && e.message) || e}`)
+  }
+}, 400)
+
+const updateRotatePreview = debounce(() => {
+  callRuby('preview_update', normalize(settings.value))
+}, 120)
+
+const updateViewsPreview = debounce(() => {
+  callRuby('preview_views_update', normalize(settings.value))
+}, 120)
+
+watch(
+  () => [settings.value.angle_z, settings.value.angle_x, settings.value.make_copy],
+  () => {
+    if (!ready) return
+    saveSettings()
+    updateRotatePreview()
+  }
+)
+
+watch(
+  () => [settings.value.side_view, settings.value.offset],
+  () => {
+    if (!ready) return
+    saveSettings()
+    updateViewsPreview()
+  }
+)
+
+// Выделение пропало — предпросмотр в модели больше не нужен
+watch(hasTargets, (v) => {
+  if (!v) callRuby('preview_cancel')
+})
+
+async function doApplyRotate() {
   busy.rotate = true
   try {
-    await callRuby('rotate')
+    await callRuby('preview_apply', normalize(settings.value))
     await refreshSelection()
-    showToast('Поворот выполнен (Ctrl+Z — отмена)')
+    showToast('Поворот применён (Ctrl+Z — отмена)')
   } catch (e) {
     showToast(`Ошибка: ${(e && e.message) || e}`)
   } finally {
@@ -77,10 +128,10 @@ async function doRotate() {
   }
 }
 
-async function doViews() {
+async function doApplyViews() {
   busy.views = true
   try {
-    await callRuby('views')
+    await callRuby('preview_views_apply', normalize(settings.value))
     await refreshSelection()
     showToast('Проекции созданы (Ctrl+Z — отмена)')
   } catch (e) {
@@ -88,26 +139,6 @@ async function doViews() {
   } finally {
     busy.views = false
   }
-}
-
-async function save() {
-  busy.save = true
-  try {
-    const payload = normalize(draft.value)
-    const fresh = await callRuby('settings_save', payload)
-    applied.value = normalize(fresh && fresh.angle_z !== undefined ? fresh : payload)
-    draft.value = { ...applied.value }
-    showToast('Настройки сохранены')
-  } catch (e) {
-    showToast(`Не сохранено: ${(e && e.message) || e}`)
-  } finally {
-    busy.save = false
-  }
-}
-
-function reset() {
-  draft.value = { ...DEFAULTS }
-  showToast('Значения по умолчанию (не забудьте сохранить)')
 }
 
 onMounted(async () => {
@@ -118,13 +149,13 @@ onMounted(async () => {
   try {
     const s = await callRuby('settings_get')
     if (s && typeof s === 'object') {
-      applied.value = normalize(s)
-      draft.value = { ...applied.value }
+      settings.value = normalize(s)
       if (s.version) version.value = String(s.version)
     }
   } catch {
     /* мост недоступен — работаем на значениях по умолчанию */
   }
+  ready = true
   refreshSelection()
 })
 </script>
@@ -134,7 +165,7 @@ onMounted(async () => {
     <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
       <div>
         <h1 class="text-sm font-semibold leading-tight text-slate-800">Comp Add View</h1>
-        <p class="text-xs text-slate-500">DN1Sup · панель управления</p>
+        <p class="text-xs text-slate-500">DN1Sup · настройки применяются сразу</p>
       </div>
       <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
         {{ version ? `v${version}` : '·' }}
@@ -152,29 +183,33 @@ onMounted(async () => {
         </div>
       </div>
 
-      <ActionCard
-        title="Повернуть"
-        description="Копия сдвигается влево на ширину объекта и поворачивается: сначала вокруг оси Z, затем вокруг X. Без копии — поворот на месте."
-        button-label="Повернуть"
+      <SectionBlock
+        title="Поворот"
+        description="Сначала поворот по Z, затем по X вокруг точки вставки. С копией — копия сдвигается влево на ширину объекта; без — поворот на месте."
+        button-label="Применить"
         :busy="busy.rotate"
         :disabled="!hasTargets"
-        @run="doRotate"
+        @run="doApplyRotate"
       >
-        <SchemeRotate :angle-z="draft.angle_z" :angle-x="draft.angle_x" :make-copy="draft.make_copy" />
-      </ActionCard>
+        <template #params>
+          <RotateParams :settings="settings" />
+        </template>
+        <SchemeRotate :angle-z="settings.angle_z" :angle-x="settings.angle_x" :make-copy="settings.make_copy" />
+      </SectionBlock>
 
-      <ActionCard
+      <SectionBlock
         title="Вид сверху и сбоку"
-        description="Создаёт две копии-проекции: сверху (поворот X +90°) и сбоку (поворот Z ∓90°) с отступом от исходного объекта."
+        description="Две копии-проекции: сверху (X +90°) и сбоку (Z ∓90°) с отступом от исходного объекта."
         button-label="Создать проекции"
         :busy="busy.views"
         :disabled="!hasTargets"
-        @run="doViews"
+        @run="doApplyViews"
       >
-        <SchemeViews :side-view="draft.side_view" :offset="draft.offset" />
-      </ActionCard>
-
-      <SettingsForm :draft="draft" :dirty="dirty" :busy="busy.save" @save="save" @reset="reset" />
+        <template #params>
+          <ViewsParams :settings="settings" />
+        </template>
+        <SchemeViews :side-view="settings.side_view" :offset="settings.offset" />
+      </SectionBlock>
     </div>
 
     <div

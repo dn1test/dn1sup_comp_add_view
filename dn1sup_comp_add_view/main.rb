@@ -21,7 +21,7 @@ end
 
 module CustomTools
   module ComponentAddViews
-    VERSION  = '0.5.0'.freeze
+    VERSION  = '0.6.0'.freeze
 
     ID       = 'dn1sup_comp_add_view'.freeze
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
@@ -29,9 +29,10 @@ module CustomTools
     PAGE_URL = "https://github.com/#{REPO}/releases".freeze
     MANIFEST = { id: ID, repo: REPO, version: VERSION, asset: ASSET }.freeze
 
-    # Подключение внутренних модулей настроек, логики поворота и панели
+    # Подключение внутренних модулей настроек, логики поворота, предпросмотра и панели
     require_relative 'settings'
     require_relative 'rotator'
+    require_relative 'preview'
     require_relative 'dialog'
 
     # Регистрация элементов пользовательского интерфейса (меню и тулбар)
