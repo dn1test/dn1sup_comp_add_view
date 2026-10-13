@@ -136,6 +136,15 @@ module CustomTools
           }
           dlg.add_action_callback('preview_cancel') { |_ctx, _req_id| Preview.cancel }
           dlg.add_action_callback('open_releases') { UI.openURL(PAGE_URL) }
+          # Кнопка «круг со стрелками» в шапке панели: сначала локальная
+          # папка (DEV_DIR из MANIFEST), потом GitHub — ставится свежайшее.
+          dlg.add_action_callback('check_update') do
+            if defined?(Dn1sup::Updater)
+              Dn1sup::Updater.check_local_first!(MANIFEST.merge(force: true, async: true))
+            else
+              UI.openURL(PAGE_URL)
+            end
+          end
           dlg.set_on_closed do
             Preview.cancel
             detach_observers

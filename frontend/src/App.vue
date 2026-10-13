@@ -159,6 +159,11 @@ async function doApplyViews() {
   }
 }
 
+// Проверка обновления: сначала локальная папка разработки, потом GitHub.
+function checkUpdate() {
+  callRuby('check_update')
+}
+
 onMounted(async () => {
   // Ruby пушит состояние выделения в панель через SelectionObserver (dialog.rb)
   onEvent('selection', (info) => {
@@ -195,6 +200,18 @@ onUnmounted(() => {
         <p class="text-xs text-slate-500">DN1Sup · настройки применяются сразу</p>
       </div>
       <div class="flex items-center gap-1.5">
+        <button
+          type="button"
+          title="Проверить обновление: сначала локальная папка разработки, потом GitHub"
+          aria-label="Проверить обновление"
+          class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600"
+          @click="checkUpdate"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
+        </button>
         <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
           {{ version ? `v${version}` : '·' }}
         </span>

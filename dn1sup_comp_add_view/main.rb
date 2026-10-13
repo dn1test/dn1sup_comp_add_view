@@ -27,7 +27,10 @@ module CustomTools
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
     ASSET    = "#{ID}.rbz".freeze
     PAGE_URL = "https://github.com/#{REPO}/releases".freeze
-    MANIFEST = { id: ID, repo: REPO, version: VERSION, asset: ASSET }.freeze
+    # Папка разработки задана в самом расширении (корень репозитория):
+    # проверка обновления сначала смотрит её, потом GitHub.
+    DEV_DIR  = File.expand_path('..', __dir__).freeze
+    MANIFEST = { id: ID, repo: REPO, version: VERSION, asset: ASSET, dev_dir: DEV_DIR }.freeze
 
     # Подключение внутренних модулей настроек, логики поворота, предпросмотра и панели
     require_relative 'settings'
@@ -78,7 +81,7 @@ module CustomTools
       menu.add_separator
       menu.add_item('Проверить обновления сейчас') do
         if defined?(Dn1sup::Updater)
-          Dn1sup::Updater.check!(CustomTools::ComponentAddViews::MANIFEST.merge(force: true, async: true))
+          Dn1sup::Updater.check_local_first!(CustomTools::ComponentAddViews::MANIFEST.merge(force: true, async: true))
         else
           UI.openURL(CustomTools::ComponentAddViews::PAGE_URL)
         end
@@ -103,7 +106,7 @@ module CustomTools
           # id таймера хранится в ivar неймспейса: unload! останавливает его
           # при переключении канала, иначе таймер переживёт remove_const.
           @update_timer_id = UI.start_timer(15, false) do
-            Dn1sup::Updater.check!(CustomTools::ComponentAddViews::MANIFEST.merge(async: true))
+            Dn1sup::Updater.check_local_first!(CustomTools::ComponentAddViews::MANIFEST.merge(async: true))
           end
         end
       end

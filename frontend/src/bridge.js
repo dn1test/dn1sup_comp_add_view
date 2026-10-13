@@ -122,6 +122,8 @@ function mockCall(action, payload) {
       return { action: 'views' }
     case 'preview_cancel':
       return null
+    case 'check_update':
+      return null
     default:
       return null
   }
