@@ -1,7 +1,7 @@
 {
   "name": "dn1sup-comp-add-view-panel",
   "private": true,
-  "version": "0.6.2",
+  "version": "0.6.3",
   "type": "module",
   "description": "Панель управления расширения DN1Sup Component Add View (собирается в dn1sup_comp_add_view/resources/panel.html)",
   "scripts": {
