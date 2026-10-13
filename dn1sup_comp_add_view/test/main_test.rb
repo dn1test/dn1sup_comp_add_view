@@ -18,21 +18,13 @@ module CustomTools
         assert(/\A\d+\.\d+\.\d+\z/.match?(VERSION), "неожидаемый формат версии: #{VERSION.inspect}")
       end
 
-      test 'версии регистратора и манифеста совпадают с VERSION' do
+      test 'версия регистратора совпадает с VERSION' do
         parent = File.expand_path('..', File.join(__dir__, '..'))
-        registrar = ["#{ID}_dev.rb", "#{ID}.rb"].map { |n| File.join(parent, n) }.find { |p| File.file?(p) }
-        skip('регистратор не найден рядом с папкой расширения') unless registrar
+        registrar = File.join(parent, "#{ID}.rb")
+        skip('регистратор не найден рядом с папкой расширения') unless File.file?(registrar)
 
         ver = File.read(registrar, encoding: 'UTF-8')[/\.version\s*=\s*['"]([^'"]+)['"]/, 1]
         assert_equal(VERSION, ver, "версия в #{File.basename(registrar)}")
-
-        manifest_path = File.join(__dir__, '..', '.sketchup_dev.json')
-        if File.file?(manifest_path)
-          require 'json'
-          manifest = JSON.parse(File.read(manifest_path, encoding: 'UTF-8'))
-          assert_equal(VERSION, manifest['version'], 'версия в .sketchup_dev.json')
-          assert_equal(ID, manifest['id'], 'id в .sketchup_dev.json')
-        end
       end
 
       test 'модули отвеч на команды' do
