@@ -76,7 +76,10 @@ module CustomTools
         # @return [Hash]
         def settings_hash
           z, x, copy, side, offset = Settings.get_settings
-          { angle_z: z, angle_x: x, make_copy: copy, side_view: side, offset: offset, version: VERSION }
+          # dev_build — загружен именно dev-вариант (Plugins/<id>_dev):
+          # бейдж DEV в шапке панели
+          { angle_z: z, angle_x: x, make_copy: copy, side_view: side, offset: offset,
+            version: VERSION, dev_build: DEV_BUILD }
         end
 
         # Пушит событие в панель: window.__dn1Event({type:, id:, payload:}).

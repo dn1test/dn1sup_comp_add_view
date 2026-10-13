@@ -16,6 +16,7 @@ const DEFAULTS = Object.freeze({
 })
 
 const version = ref('')
+const devBuild = ref(false) // загружен dev-вариант (Plugins/<id>_dev) — бейдж DEV в шапке
 const settings = ref({ ...DEFAULTS })
 const selection = ref({ total: 0, targets: 0 })
 const busy = reactive({ rotate: false, views: false })
@@ -169,6 +170,7 @@ onMounted(async () => {
     if (s && typeof s === 'object') {
       settings.value = normalize(s)
       if (s.version) version.value = String(s.version)
+      devBuild.value = Boolean(s.dev_build)
     }
   } catch {
     /* мост недоступен — работаем на значениях по умолчанию */
@@ -194,9 +196,16 @@ onUnmounted(() => {
         <h1 class="text-sm font-semibold leading-tight text-slate-800">Comp Add View</h1>
         <p class="text-xs text-slate-500">DN1Sup · настройки применяются сразу</p>
       </div>
-      <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-        {{ version ? `v${version}` : '·' }}
-      </span>
+      <div class="flex items-center gap-1.5">
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+          {{ version ? `v${version}` : '·' }}
+        </span>
+        <span
+          v-if="devBuild"
+          class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700"
+          title="Работает dev-вариант (рабочая копия sketchup-dev-mcp), не релиз"
+        >DEV</span>
+      </div>
     </header>
 
     <div class="flex-1 overflow-y-auto">

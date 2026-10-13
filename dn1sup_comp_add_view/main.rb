@@ -21,7 +21,10 @@ end
 
 module CustomTools
   module ComponentAddViews
-    VERSION  = '0.6.3'.freeze
+    VERSION  = '0.6.4'.freeze
+    # DEV-вариант живёт в Plugins/<id>_dev/ — признак по имени корневой папки
+    # (main.rb лежит в корне папки расширения)
+    DEV_BUILD = File.basename(__dir__).end_with?('_dev').freeze
 
     ID       = 'dn1sup_comp_add_view'.freeze
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
