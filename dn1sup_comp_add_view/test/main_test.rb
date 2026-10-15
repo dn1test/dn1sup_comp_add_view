@@ -132,26 +132,71 @@ module CustomTools
         assert_equal(10.mm, Rotator.calculate_gap(bounds, '1%').to_f, 'проценты не падают ниже 10мм')
       end
 
-      # Живой тест с моделью — выполняется только внутри SketchUp.
-      test 'дублирование группы добавляет копию в модель' do
-        skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
+    # Живой тест с моделью — выполняется только внутри SketchUp.
+    test 'дублирование группы добавляет копию в модель' do
+      skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
 
-        model = Sketchup.active_model
-        before = model.entities.count
-        group = model.entities.add_group
-        group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
-        copy = nil
-        begin
-          copy = Rotator.duplicate_entity(group)
-          assert(copy.valid?, 'дубликат невалиден')
-          assert_equal(before + 2, model.entities.count, 'копия не добавлена в модель')
-        ensure
-          # тест не оставляет следов в модели пользователя
-          [copy, group].each do |e|
-            e.erase! if e.respond_to?(:valid?) && e.valid?
-          end
+      model = Sketchup.active_model
+      before = model.entities.count
+      group = model.entities.add_group
+      group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
+      copy = nil
+      begin
+        copy = Rotator.duplicate_entity(group)
+        assert(copy.valid?, 'дубликат невалиден')
+        assert_equal(before + 2, model.entities.count, 'копия не добавлена в модель')
+      ensure
+        # тест не оставляет следов в модели пользователя
+        [copy, group].each do |e|
+          e.erase! if e.respond_to?(:valid?) && e.valid?
         end
       end
     end
+
+    # Живой тест: призрак предпросмотра — схематичный каркас (группа только
+    # с рёбрами габарита), а не полная копия геометрии; cancel убирает его
+    # целиком и не трогает исходный объект.
+    test 'предпросмотр: призрак — каркасная рамка из рёбер, а не копия' do
+      skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
+
+      model = Sketchup.active_model
+      group = model.entities.add_group
+      group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
+      model.selection.add(group)
+      frame = nil
+      begin
+        assert(Preview.update(:rotate, { 'angle_z' => 30, 'angle_x' => 0, 'make_copy' => true }),
+               'Preview.update не отработал на выделенной группе')
+        assert(Preview.active?, 'предпросмотр не активен после update')
+
+        frame = model.entities.grep(Sketchup::Group).find do |g|
+          next false if g == group
+
+          edges = g.entities.grep(Sketchup::Edge)
+          g.entities.grep(Sketchup::Face).empty? && edges.size == 12
+        end
+        assert(frame, 'каркасный призрак (12 рёбер, без граней) не найден в модели')
+
+        assert(Preview.cancel, 'cancel должен снимать активный предпросмотр')
+        assert(!frame.valid?, 'каркас не убран отменой предпросмотра')
+        assert(group.valid?, 'исходная группа не должна затрагиваться предпросмотром')
+      ensure
+        Preview.cancel
+        model.selection.clear
+        group.erase! if group.respond_to?(:valid?) && group.valid?
+        frame.erase! if frame.respond_to?(:valid?) && frame.valid?
+      end
+    end
   end
+end
+
+# Прямой запуск (ruby test/main_test.rb) печатает отчёт в stdout и возвращает
+# ненулевой код при провалах. Внутри SketchUp ($PROGRAM_NAME — sketchup.exe)
+# тесты запускает сам ext_test через Test.run! — здесь молчим.
+if $PROGRAM_NAME == __FILE__
+  require 'json'
+  report = CustomTools::ComponentAddViews::Test.run!
+  puts JSON.pretty_generate(report)
+  exit(1) unless report['failures'].empty?
+end
 end

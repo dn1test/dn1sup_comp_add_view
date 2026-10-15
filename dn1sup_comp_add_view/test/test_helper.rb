@@ -13,6 +13,15 @@
 # перезапускать сколько угодно (run! сам очищает список).
 # =============================================================================
 
+# Локальный запуск вне SketchUp: подкладываем мини-заглушку sketchup.rb
+# (tools/test_stub), чтобы main.rb загрузился; модельные тесты ниже уходят
+# в skip по отсутствию Sketchup.active_model. Внутри SketchUp заглушка
+# не подключается никогда.
+unless defined?(Sketchup)
+  stub_dir = File.expand_path('../../tools/test_stub', __dir__)
+  $LOAD_PATH.unshift(stub_dir) if File.directory?(stub_dir)
+end
+
 require_relative '../main' unless defined?(CustomTools::ComponentAddViews::VERSION)
 
 module CustomTools

@@ -5,11 +5,12 @@ require 'json'
 
 module CustomTools
   module ComponentAddViews
-    # Живой 3D-предпросмотр операций панели: копии-призраки показывают конечное
-    # положение объектов и обновляются при каждом изменении параметров; кнопка
-    # «Применить» в панели снимает призраки и выполняет обычную операцию
-    # Rotator, так что результат совпадает с предпросмотром, а Ctrl+Z отменяет
-    # её одним шагом.
+    # Живой 3D-предпросмотр операций панели: схематичные призраки (каркасные
+    # рамки габаритов) показывают, где окажутся объекты, и обновляются при
+    # каждом изменении параметров — включая отступ — мгновенно, без
+    # перерисовки тяжёлой геометрии; кнопка «Применить» в панели снимает
+    # призраки и выполняет обычную операцию Rotator, так что результат
+    # совпадает с предпросмотром, а Ctrl+Z отменяет её одним шагом.
     #
     # Призраки живут внутри ОДНОЙ открытой операции («Предпросмотр»): смена
     # transformation у призраков не засоряет undo, отмена (abort_operation)
@@ -19,6 +20,13 @@ module CustomTools
     # (наблюдатели в dialog.rb).
     module Preview
       KINDS = %i[rotate views].freeze
+      # Пары индексов углов бокса (BoundingBox#corner), отличающихся одной
+      # координатой: 12 рёбер каркаса (4 по X, 4 по Y, 4 по Z)
+      BOX_EDGE_PAIRS = [
+        [0, 1], [2, 3], [4, 5], [6, 7],
+        [0, 2], [1, 3], [4, 6], [5, 7],
+        [0, 4], [1, 5], [2, 6], [3, 7]
+      ].freeze
 
       class << self
         # Обновляет предпросмотр: при смене выделения или типа операции
@@ -135,8 +143,49 @@ module CustomTools
         # Набор призраков для одного объекта: 1 для поворота,
         # 2 (вид сверху + вид сбоку) для проекций
         def make_ghosts(kind, ent)
-          first = Rotator.duplicate_entity(ent)
-          kind == :views ? [first, Rotator.duplicate_entity(ent)] : [first]
+          first = make_schematic_ghost(ent)
+          kind == :views ? [first, make_schematic_ghost(ent)] : [first]
+        end
+
+        # Схематичный призрак: группа-каркас из 12 рёбер, точно накрывающая
+        # габаритный бокс объекта. Рёбра строятся в локальных координатах
+        # группы (мировые углы бокса переводятся обратной трансформацией),
+        # а группа получает transformation объекта — дальше apply_* двигают
+        # каркас теми же шагами, что и реальную копию в Rotator, поэтому
+        # предпросмотр совпадает с результатом применения.
+        # @param [Sketchup::ComponentInstance, Sketchup::Group] ent цель
+        # @return [Sketchup::Group] каркасный призрак
+        def make_schematic_ghost(ent)
+          group = ent.parent.entities.add_group
+          box = ent.bounds
+          if box.valid?
+            to_local = ent.transformation.inverse
+            pts = (0..7).map { |i| box.corner(i).transform(to_local) }
+            mat = preview_material
+            BOX_EDGE_PAIRS.each do |a, b|
+              edge = group.entities.add_line(pts[a], pts[b])
+              # у плоской геометрии часть рёбер вырожденная — add_line даёт nil
+              edge.material = mat if edge
+            end
+            group.material = mat
+          end
+          # призрак сразу занимает место исходного объекта; apply_* ниже
+          # всё равно переприсвоит трансформацию, но и в момент между
+          # созданием и применением рамка уже там, где нужно
+          group.transformation = ent.transformation
+          group
+        end
+
+        # Акцентный материал каркаса предпросмотра (создаётся один на модель)
+        # @return [Sketchup::Material]
+        def preview_material
+          materials = Sketchup.active_model.materials
+          mat = materials['dn1sup_preview']
+          unless mat
+            mat = materials.add('dn1sup_preview')
+            mat.color = Sketchup::Color.new(0xff, 0x8c, 0x00)
+          end
+          mat
         end
 
         # Призрак поворота: в точности шаги Rotator.rotate_selected —
