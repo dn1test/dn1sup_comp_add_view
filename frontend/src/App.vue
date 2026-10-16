@@ -195,9 +195,12 @@ onUnmounted(() => {
 <template>
   <div class="flex h-full flex-col bg-slate-50 text-slate-800">
     <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-      <div>
-        <h1 class="text-sm font-semibold leading-tight text-slate-800">Comp Add View</h1>
-        <p class="text-xs text-slate-500">DN1Sup · настройки применяются сразу</p>
+      <div class="flex items-center gap-2.5 min-w-0">
+        <img src="./assets/logo.svg" width="28" height="28" class="shrink-0" alt="DN1Sup Comp Add View">
+        <div>
+          <h1 class="text-sm font-semibold leading-tight text-slate-800">Comp Add View</h1>
+          <p class="text-xs text-slate-500">DN1Sup · настройки применяются сразу</p>
+        </div>
       </div>
       <div class="flex items-center gap-1.5">
         <button
