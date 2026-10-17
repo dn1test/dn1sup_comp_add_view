@@ -159,7 +159,7 @@ async function doApplyViews() {
   }
 }
 
-// Проверка обновления: сначала локальная папка разработки, потом GitHub.
+// Проверка обновления: релиз на GitHub.
 function checkUpdate() {
   callRuby('check_update')
 }
@@ -205,7 +205,7 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5">
         <button
           type="button"
-          title="Проверить обновление: сначала локальная папка разработки, потом GitHub"
+          title="Проверить обновление (GitHub Releases)"
           aria-label="Проверить обновление"
           class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600"
           @click="checkUpdate"
