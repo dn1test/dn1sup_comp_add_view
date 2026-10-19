@@ -1,11 +1,12 @@
 <script setup>
-// Блок операции: заголовок, параметры (слот #params) и кнопка действия.
-// Схема операций — одна общая в App.vue (SchemeCombined). Параметры применяются
-// сразу (автосохранение в App.vue), кнопка выполняет операцию над выделением.
+// Блок операции: заголовок, параметры (слот #params) и зона действия.
+// По умолчанию в зоне действия — кнопка (buttonLabel); слотом #action её можно
+// заменить (например, галочкой выбора операции: общая кнопка «Применить» одна
+// на все блоки — см. App.vue). Параметры применяются сразу (автосохранение).
 defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  buttonLabel: { type: String, required: true },
+  buttonLabel: { type: String, default: '' },
   busy: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false }
 })
@@ -22,13 +23,18 @@ defineEmits(['run'])
       <slot name="params" />
     </div>
 
-    <button
-      type="button"
-      class="mt-3 w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-700 active:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
-      :disabled="busy || disabled"
-      @click="$emit('run')"
-    >
-      {{ busy ? 'Выполняется…' : buttonLabel }}
-    </button>
+    <div class="mt-3">
+      <slot name="action">
+        <button
+          v-if="buttonLabel"
+          type="button"
+          class="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-700 active:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="busy || disabled"
+          @click="$emit('run')"
+        >
+          {{ busy ? 'Выполняется…' : buttonLabel }}
+        </button>
+      </slot>
+    </div>
   </section>
 </template>

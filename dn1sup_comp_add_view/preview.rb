@@ -89,6 +89,33 @@ module CustomTools
           true
         end
 
+        # Комбинированное применение — подмножество операций над ОДНИМ и тем же
+        # выделением (галочки «Поворот» / «Виды сверху и сбоку» и одна кнопка
+        # «Применить» в панели). Каждая операция Rotator пересобирает выделение
+        # из созданных объектов, поэтому между шагами выделение восстанавливается
+        # на исходные цели. Одна операция ведёт себя как apply.
+        # @param kinds [Array] подмножество KINDS
+        # @return [Boolean]
+        def apply_many(kinds, raw = {})
+          list = Array(kinds).map { |k| k.to_s.to_sym }.select { |k| KINDS.include?(k) }
+          return false if list.empty?
+
+          model = Sketchup.active_model
+          targets = model.selection.select do |e|
+            e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group)
+          end
+          return false if targets.empty?
+
+          list.each_with_index do |kind, i|
+            apply(kind, raw)
+            next if i == list.size - 1
+
+            model.selection.clear
+            model.selection.add(targets)
+          end
+          true
+        end
+
         # Снимает предпросмотр; безопасен, когда предпросмотр не активен.
         # @return [Boolean] был ли активен предпросмотр
         def cancel
@@ -189,12 +216,15 @@ module CustomTools
         end
 
         # Призрак поворота: в точности шаги Rotator.rotate_selected —
-        # сдвиг копии влево на ширину (если make_copy), затем поворот вокруг
-        # точки вставки: сначала Z, затем X
+        # сдвиг копии влево на ширину плюс отступ (если make_copy), затем
+        # поворот вокруг точки вставки: сначала Z, затем X, в конце низ
+        # призрака возвращается на уровень низа оригинала
         def apply_rotate(ghost, ent, params)
+          orig = ent.bounds
           ghost.transformation = ent.transformation
           if bool_param(params['make_copy'])
-            ghost.transform!(Geom::Transformation.translation([-ent.bounds.width, 0, 0]))
+            gap = Rotator.calculate_gap(orig, params['offset'])
+            ghost.transform!(Geom::Transformation.translation([Rotator.rotate_copy_shift(orig, gap), 0, 0]))
           end
           origin = ghost.transformation.origin
           z = num_param(params['angle_z'])
@@ -204,6 +234,10 @@ module CustomTools
             Geom::Transformation.rotation(origin, X_AXIS, x.degrees) *
             Geom::Transformation.rotation(origin, Z_AXIS, z.degrees)
           )
+          if orig.valid?
+            dz = orig.min.z - ghost.bounds.min.z
+            ghost.transform!(Geom::Transformation.translation([0, 0, dz]))
+          end
         end
 
         # Призраки проекций: в точности шаги Rotator.create_top_side_views —

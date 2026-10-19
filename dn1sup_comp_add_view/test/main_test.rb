@@ -147,6 +147,17 @@ module CustomTools
         assert_equal(10.mm, Rotator.calculate_gap(bounds, '1%').to_f, 'проценты не падают ниже 10мм')
       end
 
+      # Копия «Поворота» встаёт не вплотную: сдвиг влево = ширина + отступ
+      test 'rotate_copy_shift: ширина плюс отступ, знак влево' do
+        skip('вне SketchUp: нет Geom::BoundingBox') unless defined?(Geom::BoundingBox)
+
+        bounds = Geom::BoundingBox.new
+        bounds.add([0, 0, 0])
+        bounds.add([100.mm, 50.mm, 20.mm])
+
+        assert_equal(-120.mm, Rotator.rotate_copy_shift(bounds, 20.mm).to_f, 'ширина 100мм + отступ 20мм')
+      end
+
     # Живой тест с моделью — выполняется только внутри SketchUp.
     test 'дублирование группы добавляет копию в модель' do
       skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
@@ -201,6 +212,74 @@ module CustomTools
         model.selection.clear
         group.erase! if group.respond_to?(:valid?) && group.valid?
         frame.erase! if frame.respond_to?(:valid?) && frame.valid?
+      end
+    end
+
+    # Живой тест: поворотная копия не проваливается ниже низа оригинала —
+    # наклон по X вокруг точки вставки, особенно с тумблером «+180° к Z»,
+    # компенсируется возвратом объекта на исходный уровень.
+    test 'поворот: низ копии остаётся на уровне низа оригинала' do
+      skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
+
+      model = Sketchup.active_model
+      group = model.entities.add_group
+      face = group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
+      face.pushpull(300.mm)
+      # точка вставки совпадает с углом габарита: без исправления rot180 +
+      # наклон X уводил бы низ копии примерно на 56 мм ниже уровня оригинала
+      group.transformation = Geom::Transformation.translation([500.mm, 50.mm, 0])
+      model.selection.add(group)
+      orig_min_z = group.bounds.min.z
+      created = []
+      begin
+        # настройки передаются напрямую: тесты не трогают файл настроек
+        Rotator.rotate_selected([35.0, 35.0, true, 'Справа', '20%', true])
+        created = model.selection.to_a
+        copy = created.first
+        assert(copy, 'копия не создана и не выделена')
+        assert((copy.bounds.min.z - orig_min_z).abs < 0.01.mm,
+               "низ копии (#{copy.bounds.min.z}) провалился ниже низа оригинала (#{orig_min_z})")
+      ensure
+        model.selection.clear
+        (created + [group]).each do |e|
+          e.erase! if e.respond_to?(:valid?) && e.valid?
+        end
+      end
+    end
+
+    # Живой тест: комбинированное «Применить» (одна кнопка с галочками) —
+    # обе операции над одним и тем же выделением: выделение восстанавливается
+    # между шагами, создаются и копия поворота, и обе проекции.
+    test 'apply_many: обе операции над одним выделением' do
+      skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
+
+      model = Sketchup.active_model
+      group = model.entities.add_group
+      face = group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
+      face.pushpull(20.mm)
+      model.selection.clear
+      # без выделения комбинированное применение отказывает
+      assert(!Preview.apply_many(%w[rotate views], {}), 'apply_many без выделения должен вернуть false')
+
+      # apply_many пишет параметры в настройки (как и обычное «Применить»),
+      # поэтому после теста возвращаем то, что было
+      prev = Settings.get_settings
+      model.selection.add(group)
+      before = model.entities.to_a
+      begin
+        params = {
+          'angle_z' => 30, 'angle_x' => 0, 'make_copy' => true,
+          'side_view' => 'Справа', 'offset' => '20%', 'rot180' => false
+        }
+        assert(Preview.apply_many(%w[rotate views], params),
+               'apply_many не отработал на выделенной группе')
+        new_items = model.entities.to_a - before
+        assert(new_items.size >= 3, "ожидали копию поворота и две проекции, создано: #{new_items.size}")
+      ensure
+        model.selection.clear
+        (model.entities.to_a - before).each { |e| e.erase! if e.respond_to?(:valid?) && e.valid? }
+        group.erase! if group.respond_to?(:valid?) && group.valid?
+        Settings.save_settings(*prev) if prev && prev.size == 6
       end
     end
   end

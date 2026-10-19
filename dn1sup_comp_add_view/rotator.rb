@@ -19,17 +19,31 @@ module CustomTools
         end
       end
 
-      # Выполняет копирование слева (опционально) и поворот выделенных объектов вокруг осей Z и X
+      # Горизонтальный сдвиг копии при «Повороте с копией»: габаритная ширина
+      # объекта плюс отступ, чтобы копия не прилегала к оригиналу вплотную
+      # @param [Geom::BoundingBox] bounds габарит объекта
+      # @param [Length, Numeric] gap отступ (Rotator.calculate_gap)
+      # @return [Numeric] смещение по X (отрицательное — влево)
+      def self.rotate_copy_shift(bounds, gap)
+        -(bounds.width + gap)
+      end
+
+      # Выполняет копирование слева (опционально) и поворот выделенных объектов вокруг осей Z и X.
+      # После поворота низ объекта выравнивается по низу оригинала — вращение
+      # вокруг точки вставки (наклон по X, особенно с тумблером «+180° к Z»)
+      # иначе уводит часть геометрии ниже исходного уровня
+      # @param [Array, nil] params кортеж настроек (как Settings.get_settings);
+      #   nil — прочитать из конфигурационного файла
       # @return [void]
-      def self.rotate_selected
+      def self.rotate_selected(params = nil)
         model = Sketchup.active_model
         # Фильтруем объекты: обрабатываем только компоненты и группы
         targets = model.selection.select { |e| e.is_a?(Sketchup::ComponentInstance) || e.is_a?(Sketchup::Group) }
 
         return UI.messagebox('Пожалуйста, выделите компонент или группу.') if targets.empty?
 
-        # Загрузка параметров из конфигурационного файла
-        z_deg, x_deg, make_copy, _side, _offset, rot180 = Settings.get_settings
+        # Загрузка параметров: переданные (тесты) или из конфигурационного файла
+        z_deg, x_deg, make_copy, _side, offset_setting, rot180 = params || Settings.get_settings
         z_deg += 180.0 if rot180 # тумблер «+180° к Z»
         op_name = make_copy ? 'Копия слева и поворот Z-X' : 'Поворот Z-X'
 
@@ -37,10 +51,14 @@ module CustomTools
         model.start_operation(op_name, true)
         begin
           new_items = targets.map do |ent|
-            # 1. При создании копии добавляем экземпляр в тот же контейнер и сдвигаем влево на габаритную ширину
+            orig_bounds = ent.bounds
+            # 1. При создании копии добавляем экземпляр в тот же контейнер и
+            #    сдвигаем влево на габаритную ширину плюс отступ
             target = if make_copy
                        copy = duplicate_entity(ent)
-                       shift_left = Geom::Transformation.translation([-ent.bounds.width, 0, 0])
+                       shift_left = Geom::Transformation.translation(
+                         [rotate_copy_shift(orig_bounds, calculate_gap(orig_bounds, offset_setting)), 0, 0]
+                       )
                        copy.transform!(shift_left)
                        copy
                      else
@@ -52,6 +70,13 @@ module CustomTools
             rot = Geom::Transformation.rotation(origin, X_AXIS, x_deg.degrees) *
                   Geom::Transformation.rotation(origin, Z_AXIS, z_deg.degrees)
             target.transform!(rot)
+
+            # 3. Возвращаем низ объекта на исходный уровень: наклон по X
+            #    вокруг точки вставки проваливает геометрию ниже низа оригинала
+            if orig_bounds.valid?
+              dz = orig_bounds.min.z - target.bounds.min.z
+              target.transform!(Geom::Transformation.translation([0, 0, dz]))
+            end
 
             target
           end

@@ -148,6 +148,15 @@ module CustomTools
             push_selection
             push_event('result', id: req_id, payload: { action: 'views' })
           }
+          # Комбинированное «Применить»: подмножество операций (галочки панели)
+          # над одним и тем же выделением — apply_many восстанавливает выделение
+          # между шагами
+          dlg.add_action_callback('preview_apply_many') { |_ctx, req_id, params|
+            kinds = params.is_a?(Hash) ? Array(params['kinds']) : []
+            Preview.apply_many(kinds, params)
+            push_selection
+            push_event('result', id: req_id, payload: { action: 'many', kinds: kinds })
+          }
           dlg.add_action_callback('preview_cancel') { |_ctx, _req_id| Preview.cancel }
           dlg.add_action_callback('open_releases') { UI.openURL(PAGE_URL) }
           # Кнопка «круг со стрелками» в шапке панели: проверка релиза на GitHub.

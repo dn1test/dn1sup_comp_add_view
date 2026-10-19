@@ -20,7 +20,11 @@ const DEFAULTS = Object.freeze({
 const version = ref('')
 const settings = ref({ ...DEFAULTS })
 const selection = ref({ total: 0, targets: 0 })
-const busy = reactive({ rotate: false, views: false })
+const busy = reactive({ rotate: false, views: false, apply: false })
+// Общая кнопка «Применить»: галочки выбирают, какие операции выполнить.
+// Обе включены по умолчанию — кнопка без галочек ничего не делает.
+const applyRotate = ref(true)
+const applyViews = ref(true)
 const toast = ref('')
 // Последняя стадия апдейтера ({stage, latest, current, percent, message, code});
 // приходит событием 'update_status' из dialog.rb (status_cb проверки обновлений)
@@ -32,6 +36,16 @@ let toastTimer = null
 let ready = false
 
 const hasTargets = computed(() => selection.value.targets > 0)
+// Применить можно, если есть цели и отмечена хотя бы одна операция
+const canApply = computed(() => hasTargets.value && (applyRotate.value || applyViews.value))
+const applying = computed(() => busy.apply)
+const applyHint = computed(() => {
+  if (!hasTargets.value) return 'Выделите компонент или группу'
+  if (applyRotate.value && applyViews.value) return 'Будут выполнены: поворот и виды сверху и сбоку'
+  if (applyRotate.value) return 'Будет выполнен: поворот'
+  if (applyViews.value) return 'Будут выполнены: виды сверху и сбоку'
+  return 'Отметьте хотя бы одну операцию'
+})
 const selectionText = computed(() => {
   const { total, targets } = selection.value
   if (targets > 0) return `Выделено объектов: ${targets} — предпросмотр и операции доступны`
@@ -47,6 +61,7 @@ const updateBusy = computed(() =>
 
 // Подсказка выполняемой операции для статус-бара ('' — ничего не выполняется)
 const busyHint = computed(() => {
+  if (busy.apply) return 'Выполняется применение…'
   if (busy.rotate) return 'Выполняется поворот…'
   if (busy.views) return 'Создаются проекции…'
   return ''
@@ -151,21 +166,37 @@ const updateViewsPreview = debounce(() => {
   callRuby('preview_views_update', normalize(settings.value))
 }, 60)
 
+// Отступ влияет на обе операции (и на копию «Поворота», и на проекции):
+// слайдер отступа обновляет предпросмотр того блока, который пользователь
+// редактировал последним
+const lastBlock = ref('rotate')
+
 watch(
   () => [settings.value.angle_z, settings.value.angle_x, settings.value.make_copy, settings.value.rot180],
   () => {
     if (!ready) return
+    lastBlock.value = 'rotate'
     saveSettings()
     updateRotatePreview()
   }
 )
 
 watch(
-  () => [settings.value.side_view, settings.value.offset],
+  () => settings.value.side_view,
+  () => {
+    if (!ready) return
+    lastBlock.value = 'views'
+    saveSettings()
+    updateViewsPreview()
+  }
+)
+
+watch(
+  () => settings.value.offset,
   () => {
     if (!ready) return
     saveSettings()
-    updateViewsPreview()
+    lastBlock.value === 'rotate' ? updateRotatePreview() : updateViewsPreview()
   }
 )
 
@@ -174,29 +205,30 @@ watch(hasTargets, (v) => {
   if (!v) callRuby('preview_cancel')
 })
 
-async function doApplyRotate() {
-  busy.rotate = true
+// Общее «Применить»: отмеченные галочками операции выполняются над одним и
+// тем же выделением — Ruby (Preview.apply_many) восстанавливает выделение
+// между шагами, поэтому проекции создаются от исходного объекта, а не от
+// копии поворота. Каждая операция — отдельный шаг Ctrl+Z.
+async function doApply() {
+  if (!canApply.value || busy.apply) return
+  const kinds = []
+  if (applyRotate.value) kinds.push('rotate')
+  if (applyViews.value) kinds.push('views')
+  busy.apply = true
   try {
-    await callRuby('preview_apply', normalize(settings.value))
+    await callRuby('preview_apply_many', { kinds, ...normalize(settings.value) })
     await refreshSelection()
-    showToast('Поворот применён (Ctrl+Z — отмена)')
+    showToast(
+      kinds.length === 2
+        ? 'Поворот и проекции применены (Ctrl+Z — отмена по шагам)'
+        : kinds[0] === 'rotate'
+          ? 'Поворот применён (Ctrl+Z — отмена)'
+          : 'Проекции созданы (Ctrl+Z — отмена)'
+    )
   } catch (e) {
     showToast(`Ошибка: ${(e && e.message) || e}`)
   } finally {
-    busy.rotate = false
-  }
-}
-
-async function doApplyViews() {
-  busy.views = true
-  try {
-    await callRuby('preview_views_apply', normalize(settings.value))
-    await refreshSelection()
-    showToast('Проекции созданы (Ctrl+Z — отмена)')
-  } catch (e) {
-    showToast(`Ошибка: ${(e && e.message) || e}`)
-  } finally {
-    busy.views = false
+    busy.apply = false
   }
 }
 
@@ -297,29 +329,46 @@ onUnmounted(() => {
 
       <SectionBlock
         title="Поворот"
-        description="Копия сдвигается влево на ширину объекта (или поворот на месте), затем поворот вокруг точки вставки: сначала Z (30–70°, тумблером +180°), затем X (30–70°)."
-        button-label="Применить"
-        :busy="busy.rotate"
-        :disabled="!hasTargets"
-        @run="doApplyRotate"
+        description="Копия сдвигается влево на ширину объекта плюс отступ (или поворот на месте), затем поворот вокруг точки вставки: сначала Z (30–70°, тумблером +180°), затем X (30–70°)."
       >
         <template #params>
           <RotateParams :settings="settings" />
+        </template>
+        <template #action>
+          <label class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50">
+            <input v-model="applyRotate" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600" />
+            Поворот
+          </label>
         </template>
       </SectionBlock>
 
       <SectionBlock
         title="Вид сверху и сбоку"
         description="Копия «вид сверху» ставится над объектом, копия «вид сбоку» — справа; отступ задаётся в процентах. Переключатель выбирает направление взгляда: вид справа (Z −90°) или слева (Z +90°)."
-        button-label="Создать проекции"
-        :busy="busy.views"
-        :disabled="!hasTargets"
-        @run="doApplyViews"
       >
         <template #params>
           <ViewsParams :settings="settings" />
         </template>
+        <template #action>
+          <label class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50">
+            <input v-model="applyViews" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600" />
+            Виды сверху и сбоку
+          </label>
+        </template>
       </SectionBlock>
+
+      <!-- Общая кнопка применения: выполняет отмеченные галочками операции -->
+      <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <button
+          type="button"
+          class="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-700 active:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="!canApply || applying"
+          @click="doApply"
+        >
+          {{ applying ? 'Выполняется…' : 'Применить' }}
+        </button>
+        <p class="mt-2 text-center text-xs text-slate-400">{{ applyHint }}</p>
+      </section>
     </div>
 
     <!-- Статус-бар: состояние обновления, выполняемая операция, подсказка по выделению -->

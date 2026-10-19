@@ -4,3 +4,4 @@ angle_z: 35.0
 angle_x: 35.0
 side_view: Слева
 offset: 20%
+rot180: false

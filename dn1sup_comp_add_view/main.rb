@@ -21,7 +21,7 @@ end
 
 module CustomTools
   module ComponentAddViews
-    VERSION  = '0.12.0'.freeze
+    VERSION  = '0.13.0'.freeze
 
     ID       = 'dn1sup_comp_add_view'.freeze
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
