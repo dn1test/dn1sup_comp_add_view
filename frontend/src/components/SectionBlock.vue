@@ -16,7 +16,9 @@ defineEmits(['run'])
 
 <template>
   <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-    <h2 class="text-sm font-semibold text-slate-800">{{ title }}</h2>
+    <slot name="title">
+      <h2 class="text-sm font-semibold text-slate-800">{{ title }}</h2>
+    </slot>
     <p v-if="description" class="mt-0.5 text-xs leading-relaxed text-slate-500">{{ description }}</p>
 
     <div class="mt-3">

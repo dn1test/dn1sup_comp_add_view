@@ -105,7 +105,7 @@ npm run build
 
 - **Автор**: DN1Sup <dn1codegen@gmail.com>
 - **Лицензия**: MIT — см. файл [LICENSE](LICENSE)
-- **Версия**: 0.13.1
+- **Версия**: 0.13.2
 - **Год**: 2026
 
 ---

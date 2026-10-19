@@ -21,6 +21,10 @@ const version = ref('')
 const settings = ref({ ...DEFAULTS })
 const selection = ref({ total: 0, targets: 0 })
 const busy = reactive({ apply: false })
+// Галочки в заголовках секций выбирают, какие операции выполнит кнопка
+// «Применить»; обе включены по умолчанию
+const applyRotate = ref(true)
+const applyViews = ref(true)
 const toast = ref('')
 // Последняя стадия апдейтера ({stage, latest, current, percent, message, code});
 // приходит событием 'update_status' из dialog.rb (status_cb проверки обновлений)
@@ -32,11 +36,16 @@ let toastTimer = null
 let ready = false
 
 const hasTargets = computed(() => selection.value.targets > 0)
-// Общая кнопка «Применить» выполняет обе операции над одним и тем же выделением
+// Применить можно, если есть цели и отмечена хотя бы одна операция
+const canApply = computed(() => hasTargets.value && (applyRotate.value || applyViews.value))
 const applying = computed(() => busy.apply)
-const applyHint = computed(() =>
-  hasTargets.value ? 'Будут выполнены: поворот и виды сверху и сбоку' : 'Выделите компонент или группу'
-)
+const applyHint = computed(() => {
+  if (!hasTargets.value) return 'Выделите компонент или группу'
+  if (applyRotate.value && applyViews.value) return 'Будут выполнены: поворот и виды сверху и сбоку'
+  if (applyRotate.value) return 'Будет выполнен: поворот'
+  if (applyViews.value) return 'Будут выполнены: виды сверху и сбоку'
+  return 'Отметьте хотя бы одну операцию'
+})
 const selectionText = computed(() => {
   const { total, targets } = selection.value
   if (targets > 0) return `Выделено объектов: ${targets} — предпросмотр и операции доступны`
@@ -191,17 +200,26 @@ watch(hasTargets, (v) => {
   if (!v) callRuby('preview_cancel')
 })
 
-// Общее «Применить»: обе операции над одним и тем же выделением — Ruby
-// (Preview.apply_many) восстанавливает выделение между шагами, поэтому
-// проекции создаются от исходного объекта, а не от копии поворота.
-// Каждая операция — отдельный шаг Ctrl+Z.
+// Общее «Применить»: отмеченные галочками операции выполняются над одним и
+// тем же выделением — Ruby (Preview.apply_many) восстанавливает выделение
+// между шагами, поэтому проекции создаются от исходного объекта, а не от
+// копии поворота. Каждая операция — отдельный шаг Ctrl+Z.
 async function doApply() {
-  if (!hasTargets.value || busy.apply) return
+  if (!canApply.value || busy.apply) return
+  const kinds = []
+  if (applyRotate.value) kinds.push('rotate')
+  if (applyViews.value) kinds.push('views')
   busy.apply = true
   try {
-    await callRuby('preview_apply_many', { kinds: ['rotate', 'views'], ...normalize(settings.value) })
+    await callRuby('preview_apply_many', { kinds, ...normalize(settings.value) })
     await refreshSelection()
-    showToast('Поворот и проекции применены (Ctrl+Z — отмена по шагам)')
+    showToast(
+      kinds.length === 2
+        ? 'Поворот и проекции применены (Ctrl+Z — отмена по шагам)'
+        : kinds[0] === 'rotate'
+          ? 'Поворот применён (Ctrl+Z — отмена)'
+          : 'Проекции созданы (Ctrl+Z — отмена)'
+    )
   } catch (e) {
     showToast(`Ошибка: ${(e && e.message) || e}`)
   } finally {
@@ -308,6 +326,12 @@ onUnmounted(() => {
         title="Поворот"
         description="Копия сдвигается влево на ширину объекта плюс отступ (или поворот на месте), затем поворот вокруг точки вставки: сначала Z (30–70°, тумблером +180°), затем X (30–70°)."
       >
+        <template #title>
+          <label class="flex cursor-pointer items-center gap-2.5">
+            <input v-model="applyRotate" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600" />
+            <span class="text-sm font-semibold text-slate-800">Поворот</span>
+          </label>
+        </template>
         <template #params>
           <RotateParams :settings="settings" />
         </template>
@@ -317,17 +341,23 @@ onUnmounted(() => {
         title="Вид сверху и сбоку"
         description="Копия «вид сверху» ставится над объектом, копия «вид сбоку» — справа; отступ задаётся в процентах. Переключатель выбирает направление взгляда: вид справа (Z −90°) или слева (Z +90°)."
       >
+        <template #title>
+          <label class="flex cursor-pointer items-center gap-2.5">
+            <input v-model="applyViews" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600" />
+            <span class="text-sm font-semibold text-slate-800">Вид сверху и сбоку</span>
+          </label>
+        </template>
         <template #params>
           <ViewsParams :settings="settings" />
         </template>
       </SectionBlock>
 
-      <!-- Общая кнопка применения: поворот и обе проекции над одним выделением -->
+      <!-- Общая кнопка применения: выполняет отмеченные галочками операции -->
       <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <button
           type="button"
           class="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-700 active:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="!hasTargets || applying"
+          :disabled="!canApply || applying"
           @click="doApply"
         >
           {{ applying ? 'Выполняется…' : 'Применить' }}
