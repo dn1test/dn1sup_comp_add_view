@@ -75,9 +75,9 @@ module CustomTools
         # Настройки одним хешем для панели (кортеж Settings.get_settings)
         # @return [Hash]
         def settings_hash
-          z, x, copy, side, offset = Settings.get_settings
+          z, x, copy, side, offset, rot180 = Settings.get_settings
           { angle_z: z, angle_x: x, make_copy: copy, side_view: side, offset: offset,
-            version: VERSION }
+            rot180: rot180, version: VERSION }
         end
 
         # Пушит событие в панель: window.__dn1Event({type:, id:, payload:}).
@@ -101,6 +101,16 @@ module CustomTools
           push_event('selection', payload: selection_info)
         end
 
+        # Стадии проверки/установки обновления (status_cb апдейтера, вызывается
+        # на главном потоке): статус запоминается даже при закрытой панели —
+        # переоткрытая панель покажет последнее состояние, а открытой уходит
+        # событие 'update_status' для статус-бара.
+        # @return [void]
+        def record_update_status(status)
+          @last_update_status = status
+          push_event('update_status', payload: status)
+        end
+
         private
 
         def bring_to_front
@@ -111,7 +121,11 @@ module CustomTools
 
         def build_dialog
           dlg = UI::HtmlDialog.new(DIALOG_OPTIONS)
-          dlg.add_action_callback('settings_get') { |_ctx, req_id| push_event('result', id: req_id, payload: settings_hash) }
+          dlg.add_action_callback('settings_get') do |_ctx, req_id|
+            push_event('result', id: req_id, payload: settings_hash)
+            # Переоткрытая панель сразу показывает последнее состояние обновления
+            push_event('update_status', payload: @last_update_status) if @last_update_status
+          end
           dlg.add_action_callback('settings_save') { |_ctx, req_id, params| push_event('result', id: req_id, payload: save_from_panel(params)) }
           dlg.add_action_callback('selection_info') { |_ctx, req_id| push_event('result', id: req_id, payload: selection_info) }
           # Предпросмотры: JS шлёт их при каждом изменении параметров (с дебаунсом),
@@ -137,9 +151,15 @@ module CustomTools
           dlg.add_action_callback('preview_cancel') { |_ctx, _req_id| Preview.cancel }
           dlg.add_action_callback('open_releases') { UI.openURL(PAGE_URL) }
           # Кнопка «круг со стрелками» в шапке панели: проверка релиза на GitHub.
+          # status_cb уводит все стадии проверки/установки в статус-бар панели —
+          # апдейтер при нём подавляет нативные messagebox промежуточных
+          # состояний (вопрос «установить сейчас?» остаётся нативным).
           dlg.add_action_callback('check_update') do
             if defined?(Dn1sup::Updater)
-              Dn1sup::Updater.check!(MANIFEST.merge(force: true, async: true))
+              Dn1sup::Updater.check!(
+                MANIFEST.merge(force: true, async: true,
+                               status_cb: ->(st) { record_update_status(st) })
+              )
             else
               UI.openURL(PAGE_URL)
             end
@@ -158,7 +178,8 @@ module CustomTools
           data = {} unless data.is_a?(Hash)
           data = data.transform_keys(&:to_s)
           Settings.save_settings(
-            data['angle_z'], data['angle_x'], data['make_copy'], data['side_view'], data['offset']
+            data['angle_z'], data['angle_x'], data['make_copy'], data['side_view'], data['offset'],
+            data['rot180']
           )
           settings_hash
         rescue StandardError => e

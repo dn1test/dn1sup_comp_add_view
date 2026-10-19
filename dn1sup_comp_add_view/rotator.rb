@@ -29,7 +29,8 @@ module CustomTools
         return UI.messagebox('Пожалуйста, выделите компонент или группу.') if targets.empty?
 
         # Загрузка параметров из конфигурационного файла
-        z_deg, x_deg, make_copy = Settings.get_settings
+        z_deg, x_deg, make_copy, _side, _offset, rot180 = Settings.get_settings
+        z_deg += 180.0 if rot180 # тумблер «+180° к Z»
         op_name = make_copy ? 'Копия слева и поворот Z-X' : 'Поворот Z-X'
 
         # Единая операция для поддержки отмены одним шагом (Ctrl+Z)

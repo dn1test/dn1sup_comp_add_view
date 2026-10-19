@@ -198,6 +198,7 @@ module CustomTools
           end
           origin = ghost.transformation.origin
           z = num_param(params['angle_z'])
+          z += 180.0 if bool_param(params['rot180'], false)
           x = num_param(params['angle_x'])
           ghost.transform!(
             Geom::Transformation.rotation(origin, X_AXIS, x.degrees) *
@@ -230,16 +231,17 @@ module CustomTools
           ))
         end
 
-        # Сохраняет параметры панели в настройки (пишутся все 5 значений:
+        # Сохраняет параметры панели в настройки (пишутся все 6 значений:
         # недостающие берутся из текущих настроек)
         def save_params(p)
-          z, x, copy, side, offset = Settings.get_settings
+          z, x, copy, side, offset, rot180 = Settings.get_settings
           z = num_param(p['angle_z'], z)
           x = num_param(p['angle_x'], x)
           copy = bool_param(p['make_copy'], copy)
           side = p['side_view'] if %w[Справа Слева].include?(p['side_view'].to_s)
           offset = p['offset'].to_s.strip unless p['offset'].to_s.strip.empty?
-          Settings.save_settings(z, x, copy, side, offset)
+          rot180 = bool_param(p['rot180'], rot180)
+          Settings.save_settings(z, x, copy, side, offset, rot180)
         end
 
         def parse(raw)

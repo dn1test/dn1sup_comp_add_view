@@ -59,6 +59,16 @@ module CustomTools
         assert(Panel.respond_to?(:selection_info), 'нет Panel.selection_info')
         assert(Panel.respond_to?(:settings_hash), 'нет Panel.settings_hash')
         assert(Panel.respond_to?(:push_selection), 'нет Panel.push_selection')
+        assert(Panel.respond_to?(:record_update_status), 'нет Panel.record_update_status')
+      end
+
+      # Статус-бар: record_update_status запоминает стадию апдейтера —
+      # переоткрытая панель показывает последнее состояние через settings_get
+      test 'панель: record_update_status хранит последнюю стадию обновления' do
+        stage = { stage: 'current', current: '9.9.9' }
+        Panel.record_update_status(stage)
+        assert_equal(stage, Panel.instance_variable_get(:@last_update_status),
+                     'последняя стадия обновления не сохранена')
       end
 
       # Регрессия SU2026.2: типовые методы наблюдателей удалены
@@ -99,7 +109,7 @@ module CustomTools
 
       test 'панель: settings_hash содержит ключи интерфейса' do
         h = Panel.settings_hash
-        %i[angle_z angle_x make_copy side_view offset version].each do |k|
+        %i[angle_z angle_x make_copy side_view offset rot180 version].each do |k|
           assert(h.key?(k), "нет ключа #{k}")
         end
       end
@@ -109,15 +119,20 @@ module CustomTools
         assert(File.file?(html), "нет собранной панели #{html}")
         content = File.read(html, encoding: 'UTF-8')
         assert(content.include?('id="app"'), 'panel.html без корня монтирования Vue (#app)')
+        assert(content.include?('Схема поворота и проекций'), 'panel.html без объединённой схемы (SchemeCombined)')
+        assert(!content.include?('раскладка проекций'), 'в panel.html осталась старая раздельная схема проекций')
+        assert(content.include?('update_status'), 'panel.html без канала статус-бара обновления')
+        assert(content.include?('Справка'), 'panel.html без справки (HelpDialog)')
         assert(content.bytesize > 50_000, 'panel.html подозрительно мал — бандл не встроен')
       end
 
-      test 'настройки читаются кортежем из 5 значений' do
-        z, x, make_copy, side, offset = Settings.get_settings
+      test 'настройки читаются кортежем из 6 значений' do
+        z, x, make_copy, side, offset, rot180 = Settings.get_settings
         assert(z.is_a?(Float) && x.is_a?(Float), 'углы должны быть Float')
         assert([true, false].include?(make_copy), 'make_copy должен быть Boolean')
         assert(%w[Справа Слева].include?(side), "неожидаемый вид сбоку: #{side.inspect}")
         assert(!offset.to_s.empty?, 'отступ пуст')
+        assert([true, false].include?(rot180), 'rot180 должен быть Boolean')
       end
 
       test 'calculate_gap: проценты от габарита и фиксированные мм' do
@@ -161,7 +176,8 @@ module CustomTools
 
       model = Sketchup.active_model
       group = model.entities.add_group
-      group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
+      face = group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
+      face.pushpull(20.mm) # габарит 3D: у плоской грани рёбра каркаса вырожденные
       model.selection.add(group)
       frame = nil
       begin

@@ -4,15 +4,17 @@ import { callRuby, onEvent } from './bridge.js'
 import SectionBlock from './components/SectionBlock.vue'
 import RotateParams from './components/RotateParams.vue'
 import ViewsParams from './components/ViewsParams.vue'
-import SchemeRotate from './components/SchemeRotate.vue'
-import SchemeViews from './components/SchemeViews.vue'
+import SchemeCombined from './components/SchemeCombined.vue'
+import StatusBar from './components/StatusBar.vue'
+import HelpDialog from './components/HelpDialog.vue'
 
 const DEFAULTS = Object.freeze({
   angle_z: 35,
   angle_x: 35,
   make_copy: true,
   side_view: 'Справа',
-  offset: '20%'
+  offset: 20, // проценты; в Ruby уходит строкой «20%»
+  rot180: false
 })
 
 const version = ref('')
@@ -20,6 +22,10 @@ const settings = ref({ ...DEFAULTS })
 const selection = ref({ total: 0, targets: 0 })
 const busy = reactive({ rotate: false, views: false })
 const toast = ref('')
+// Последняя стадия апдейтера ({stage, latest, current, percent, message, code});
+// приходит событием 'update_status' из dialog.rb (status_cb проверки обновлений)
+const updateStatus = ref(null)
+const helpOpen = ref(false)
 let toastTimer = null
 // Настройки грузятся асинхронно — до загрузки наблюдатели молчат,
 // чтобы не сохранять/предпросматривать значения по умолчанию
@@ -33,21 +39,55 @@ const selectionText = computed(() => {
   return 'Выделите компонент или группу в модели'
 })
 
+// Обновление считается идущим, пока апдейтер в активной стадии — крутится
+// спиннер кнопки в шапке
+const updateBusy = computed(() =>
+  ['checking', 'downloading', 'installing'].includes(updateStatus.value?.stage)
+)
+
+// Подсказка выполняемой операции для статус-бара ('' — ничего не выполняется)
+const busyHint = computed(() => {
+  if (busy.rotate) return 'Выполняется поворот…'
+  if (busy.views) return 'Создаются проекции…'
+  return ''
+})
+
+function clampPercent(v) {
+  const n = Number(String(v == null ? '' : v).replace(',', '.'))
+  const pct = Number.isFinite(n) && n > 0 ? Math.round(n) : DEFAULTS.offset
+  return Math.min(200, Math.max(1, pct))
+}
+
+// Углы работают в диапазоне 30–70°: слайдеры — весь диапазон, числовые поля
+// и значения из старых настроек приводятся к нему; разворот сверх диапазона —
+// тумблер «+180° к Z»
+function clampAngle(v) {
+  const n = Number(String(v == null ? '' : v).replace(',', '.'))
+  const a = Number.isFinite(n) ? Math.round(n) : DEFAULTS.angle_z
+  return Math.min(70, Math.max(30, a))
+}
+
+// Формат для Ruby: offset строкой «N%», как его понимает Rotator.calculate_gap
 function normalize(raw) {
   const s = raw && typeof raw === 'object' ? raw : {}
-  const num = (v) => {
-    const n = Number(String(v).replace(',', '.'))
-    return Number.isFinite(n) ? n : DEFAULTS.angle_z
-  }
-  const side = s.side_view === 'Слева' ? 'Слева' : 'Справа'
-  const offset = String(s.offset == null ? '' : s.offset).trim() || DEFAULTS.offset
   return {
-    angle_z: num(s.angle_z == null ? DEFAULTS.angle_z : s.angle_z),
-    angle_x: num(s.angle_x == null ? DEFAULTS.angle_x : s.angle_x),
+    angle_z: clampAngle(s.angle_z == null ? DEFAULTS.angle_z : s.angle_z),
+    angle_x: clampAngle(s.angle_x == null ? DEFAULTS.angle_x : s.angle_x),
     make_copy: s.make_copy !== false && s.make_copy !== 'Нет',
-    side_view: side,
-    offset
+    side_view: s.side_view === 'Слева' ? 'Слева' : 'Справа',
+    offset: `${clampPercent(s.offset)}%`,
+    rot180: s.rot180 === true || s.rot180 === 'true'
   }
+}
+
+// Значения из Ruby: offset приходит строкой «20%»; мм-значение без «%» —
+// наследие старого текстового поля, панель работает только в процентах
+function fromRuby(raw) {
+  const parsed = normalize(raw)
+  const s = raw && typeof raw === 'object' ? raw : {}
+  const m = /^(\d+(?:[.,]\d+)?)\s*%$/.exec(String(s.offset == null ? '' : s.offset).trim())
+  parsed.offset = m ? clampPercent(m[1]) : DEFAULTS.offset
+  return parsed
 }
 
 function showToast(text) {
@@ -102,16 +142,17 @@ const saveSettings = debounce(async () => {
   }
 }, 400)
 
+// 60 мс — слайдеры обновляют 3D-предпросмотр в модели практически без задержки
 const updateRotatePreview = debounce(() => {
   callRuby('preview_update', normalize(settings.value))
-}, 120)
+}, 60)
 
 const updateViewsPreview = debounce(() => {
   callRuby('preview_views_update', normalize(settings.value))
-}, 120)
+}, 60)
 
 watch(
-  () => [settings.value.angle_z, settings.value.angle_x, settings.value.make_copy],
+  () => [settings.value.angle_z, settings.value.angle_x, settings.value.make_copy, settings.value.rot180],
   () => {
     if (!ready) return
     saveSettings()
@@ -169,10 +210,17 @@ onMounted(async () => {
   onEvent('selection', (info) => {
     if (info && typeof info === 'object') selection.value = info
   })
+  // Стадии проверки/установки обновления (status_cb апдейтера → dialog.rb).
+  // «done» означает «native messagebox подавлен» — дублируем тостом.
+  onEvent('update_status', (st) => {
+    if (!st || typeof st !== 'object') return
+    updateStatus.value = st
+    if (st.stage === 'done') showToast('Обновление установлено — перезапустите SketchUp')
+  })
   try {
     const s = await callRuby('settings_get')
     if (s && typeof s === 'object') {
-      settings.value = normalize(s)
+      settings.value = fromRuby(s)
       if (s.version) version.value = String(s.version)
     }
   } catch {
@@ -205,12 +253,25 @@ onUnmounted(() => {
       <div class="flex items-center gap-1.5">
         <button
           type="button"
+          title="Справка"
+          aria-label="Справка"
+          class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600"
+          @click="helpOpen = true"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <path d="M12 17h.01" />
+          </svg>
+        </button>
+        <button
+          type="button"
           title="Проверить обновление (GitHub Releases)"
           aria-label="Проверить обновление"
           class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600"
           @click="checkUpdate"
         >
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="h-4 w-4" :class="{ 'animate-spin': updateBusy }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
             <path d="M21 3v5h-5" />
           </svg>
@@ -222,19 +283,21 @@ onUnmounted(() => {
     </header>
 
     <div class="flex-1 overflow-y-auto">
-      <div class="px-4 pt-3">
-        <div
-          class="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs"
-          :class="hasTargets ? 'border-sky-200 bg-sky-50 text-sky-700' : 'border-amber-200 bg-amber-50 text-amber-700'"
-        >
-          <span class="inline-block h-2 w-2 flex-none rounded-full" :class="hasTargets ? 'bg-sky-500' : 'bg-amber-500'"></span>
-          <span>{{ selectionText }}</span>
-        </div>
+      <!-- Единый эскиз обеих операций: реагирует на все параметры в реальном времени -->
+      <div class="mx-4 mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <SchemeCombined
+          :angle-z="settings.angle_z"
+          :angle-x="settings.angle_x"
+          :make-copy="settings.make_copy"
+          :side-view="settings.side_view"
+          :offset-percent="settings.offset"
+          :rot180="settings.rot180"
+        />
       </div>
 
       <SectionBlock
         title="Поворот"
-        description="Сначала поворот по Z, затем по X вокруг точки вставки. С копией — копия сдвигается влево на ширину объекта; без — поворот на месте."
+        description="Копия сдвигается влево на ширину объекта (или поворот на месте), затем поворот вокруг точки вставки: сначала Z (30–70°, тумблером +180°), затем X (30–70°)."
         button-label="Применить"
         :busy="busy.rotate"
         :disabled="!hasTargets"
@@ -243,12 +306,11 @@ onUnmounted(() => {
         <template #params>
           <RotateParams :settings="settings" />
         </template>
-        <SchemeRotate :angle-z="settings.angle_z" :angle-x="settings.angle_x" :make-copy="settings.make_copy" />
       </SectionBlock>
 
       <SectionBlock
         title="Вид сверху и сбоку"
-        description="Две копии-проекции: сверху (X +90°) и сбоку (Z ∓90°) с отступом от исходного объекта."
+        description="Копия «вид сверху» ставится над объектом, копия «вид сбоку» — справа; отступ задаётся в процентах. Переключатель выбирает направление взгляда: вид справа (Z −90°) или слева (Z +90°)."
         button-label="Создать проекции"
         :busy="busy.views"
         :disabled="!hasTargets"
@@ -257,15 +319,24 @@ onUnmounted(() => {
         <template #params>
           <ViewsParams :settings="settings" />
         </template>
-        <SchemeViews :side-view="settings.side_view" :offset="settings.offset" />
       </SectionBlock>
     </div>
 
+    <!-- Статус-бар: состояние обновления, выполняемая операция, подсказка по выделению -->
+    <StatusBar
+      :update="updateStatus"
+      :hint="selectionText"
+      :hint-tone="hasTargets ? 'ok' : 'warn'"
+      :busy-hint="busyHint"
+    />
+
     <div
       v-if="toast"
-      class="pointer-events-none fixed bottom-3 left-4 right-4 rounded-lg bg-slate-800 px-3 py-2 text-center text-xs text-white shadow-lg"
+      class="pointer-events-none fixed bottom-12 left-4 right-4 rounded-lg bg-slate-800 px-3 py-2 text-center text-xs text-white shadow-lg"
     >
       {{ toast }}
     </div>
+
+    <HelpDialog v-if="helpOpen" :version="version" @close="helpOpen = false" />
   </div>
 </template>

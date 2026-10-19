@@ -122,8 +122,15 @@ function mockCall(action, payload) {
       return { action: 'views' }
     case 'preview_cancel':
       return null
-    case 'check_update':
+    case 'check_update': {
+      // Демо-стадии для статус-бара вне SketchUp: checking → current
+      setTimeout(() => window.__dn1Event({ type: 'update_status', payload: { stage: 'checking' } }), 300)
+      setTimeout(
+        () => window.__dn1Event({ type: 'update_status', payload: { stage: 'current', current: MOCK_VERSION } }),
+        1800
+      )
       return null
+    }
     default:
       return null
   }

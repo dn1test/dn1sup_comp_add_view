@@ -1,7 +1,7 @@
 <script setup>
-// Блок операции: заголовок, параметры (слот #params), мини-схема (слот по
-// умолчанию) и кнопка действия. Параметры применяются сразу (автосохранение
-// в App.vue), кнопка выполняет операцию над выделением.
+// Блок операции: заголовок, параметры (слот #params) и кнопка действия.
+// Схема операций — одна общая в App.vue (SchemeCombined). Параметры применяются
+// сразу (автосохранение в App.vue), кнопка выполняет операцию над выделением.
 defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
@@ -20,10 +20,6 @@ defineEmits(['run'])
 
     <div class="mt-3">
       <slot name="params" />
-    </div>
-
-    <div class="mt-3 overflow-hidden rounded-lg border border-slate-100 bg-slate-50/60">
-      <slot />
     </div>
 
     <button

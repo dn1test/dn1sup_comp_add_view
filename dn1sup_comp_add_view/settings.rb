@@ -13,11 +13,13 @@ module CustomTools
         'angle_z' => 35.0,
         'angle_x' => 35.0,
         'side_view' => 'Справа',
-        'offset' => '20%'
+        'offset' => '20%',
+        'rot180' => false
       }.freeze
 
       # Чтение параметров из YAML-файла с безопасными значениями по умолчанию
-      # @return [Array(Float, Float, Boolean, String, String)] кортеж [угол_z, угол_x, флаг_копирования, вид_сбоку, отступ]
+      # @return [Array(Float, Float, Boolean, String, String, Boolean)] кортеж
+      #   [угол_z, угол_x, флаг_копирования, вид_сбоку, отступ, плюс_180_к_Z]
       def self.get_settings
         data = if File.exist?(CONFIG_FILE)
                  raw = File.read(CONFIG_FILE, encoding: 'UTF-8')
@@ -38,7 +40,8 @@ module CustomTools
           data['angle_x'].to_s.tr(',', '.').to_f,
           data['make_copy'] != false,
           side,
-          offset
+          offset,
+          data['rot180'] == true || data['rot180'] == 'true'
         ]
       rescue StandardError => e
         warn "[ComponentAddViews] Ошибка чтения настроек: #{e.message}"
@@ -47,7 +50,8 @@ module CustomTools
           DEFAULTS['angle_x'],
           DEFAULTS['make_copy'],
           DEFAULTS['side_view'],
-          DEFAULTS['offset']
+          DEFAULTS['offset'],
+          DEFAULTS['rot180']
         ]
       end
 
@@ -57,8 +61,9 @@ module CustomTools
       # @param [Boolean] make_copy создавать ли копию слева
       # @param [String] side_view сторона вида сбоку ('Справа' или 'Слева')
       # @param [String, Numeric] offset отступ проекций (% от габарита или мм)
+      # @param [Boolean] rot180 добавить 180° к повороту по Z
       # @return [void]
-      def self.save_settings(z, x, make_copy = true, side_view = 'Справа', offset = '20%')
+      def self.save_settings(z, x, make_copy = true, side_view = 'Справа', offset = '20%', rot180 = false)
         z_val = z.to_s.tr(',', '.').to_f
         x_val = x.to_s.tr(',', '.').to_f
         offset_str = offset.to_s.strip
@@ -69,7 +74,8 @@ module CustomTools
           'angle_z' => z_val,
           'angle_x' => x_val,
           'side_view' => (side_view.to_s.strip == 'Слева' ? 'Слева' : 'Справа'),
-          'offset' => offset_str
+          'offset' => offset_str,
+          'rot180' => (rot180 == true || rot180 == 'true')
         }
         File.write(CONFIG_FILE, YAML.dump(data), encoding: 'UTF-8')
       rescue StandardError => e
@@ -79,21 +85,22 @@ module CustomTools
       # Диалоговое окно для интерактивного изменения настроек пользователем
       # @return [void]
       def self.show_settings
-        z, x, copy, side, offset = get_settings
+        z, x, copy, side, offset, rot180 = get_settings
         prompts = [
           'Создавать копию слева:',
           'Угол Z (сначала):',
           'Угол X (затем):',
           'Вид сбоку (проекция):',
-          'Отступ проекций (% или мм):'
+          'Отступ проекций (% или мм):',
+          'Плюс 180° к повороту Z:'
         ]
-        defaults = [copy ? 'Да' : 'Нет', z, x, side, offset]
-        dropdowns = ['Да|Нет', '', '', 'Справа|Слева', '']
+        defaults = [copy ? 'Да' : 'Нет', z, x, side, offset, rot180 ? 'Да' : 'Нет']
+        dropdowns = ['Да|Нет', '', '', 'Справа|Слева', '', 'Да|Нет']
 
         res = UI.inputbox(prompts, defaults, dropdowns, 'Настройки ComponentAddViews')
         return unless res
 
-        save_settings(res[1], res[2], res[0] == 'Да', res[3], res[4])
+        save_settings(res[1], res[2], res[0] == 'Да', res[3], res[4], res[5] == 'Да')
       end
     end
   end
