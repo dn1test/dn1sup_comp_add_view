@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { t } from '../i18n/index.js'
 
 // Статус-бар панели: приоритет отображения — состояние обновления (стадии
 // апдейтера из dialog.rb), затем выполняемая операция, затем подсказка
@@ -16,18 +17,15 @@ const props = defineProps({
 })
 
 const STAGE_STYLE = {
-  checking: { dot: 'bg-sky-500 animate-pulse', text: 'text-slate-500' },
-  found: { dot: 'bg-amber-500', text: 'text-amber-700' },
-  downloading: { dot: 'bg-sky-500 animate-pulse', text: 'text-slate-500' },
-  installing: { dot: 'bg-sky-500 animate-pulse', text: 'text-slate-500' },
-  done: { dot: 'bg-emerald-500', text: 'text-emerald-700' },
-  current: { dot: 'bg-emerald-500', text: 'text-emerald-700' },
-  dismissed: { dot: 'bg-slate-300', text: 'text-slate-500' },
-  error: { dot: 'bg-red-500', text: 'text-red-600' }
+  checking: { dot: 'bg-sky-500 animate-pulse', text: 'text-slate-500 dark:text-slate-400' },
+  found: { dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400' },
+  downloading: { dot: 'bg-sky-500 animate-pulse', text: 'text-slate-500 dark:text-slate-400' },
+  installing: { dot: 'bg-sky-500 animate-pulse', text: 'text-slate-500 dark:text-slate-400' },
+  done: { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+  current: { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400' },
+  dismissed: { dot: 'bg-slate-300 dark:bg-slate-600', text: 'text-slate-500 dark:text-slate-400' },
+  error: { dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400' }
 }
-
-const DEV_COPY_HINT =
-  'Рабочая копия из папки разработки: обновления подтягиваются из рабочей папки, проверка GitHub отключена'
 
 const stage = computed(() => (props.update && props.update.stage) || '')
 
@@ -35,23 +33,23 @@ const updateText = computed(() => {
   const u = props.update || {}
   switch (u.stage) {
     case 'checking':
-      return 'Проверка обновлений…'
+      return t('status.checking')
     case 'found':
-      return `Доступна версия ${u.latest} (у вас ${u.current}) — подтвердите установку в диалоге`
+      return t('status.found', { latest: u.latest, current: u.current })
     case 'downloading':
-      return `Скачивание обновления… ${u.percent ?? 0}%`
+      return t('status.downloading', { percent: u.percent ?? 0 })
     case 'installing':
-      return 'Установка обновления…'
+      return t('status.installing')
     case 'done':
-      return 'Обновление установлено — перезапустите SketchUp'
+      return t('status.done')
     case 'current':
-      return `У вас актуальная версия ${u.current}`
+      return t('status.current', { current: u.current })
     case 'dismissed':
-      return 'Обновление отложено'
+      return t('status.dismissed')
     case 'error':
-      if (u.code === 'github_unreachable') return 'GitHub не отвечает — проверьте обновление позднее'
-      if (u.code === 'dev_copy') return DEV_COPY_HINT
-      return `Ошибка обновления: ${u.message || 'неизвестная'}`
+      if (u.code === 'github_unreachable') return t('status.githubUnreachable')
+      if (u.code === 'dev_copy') return t('status.devCopy')
+      return t('status.error', { message: u.message || 'unknown' })
     default:
       return ''
   }
@@ -71,18 +69,18 @@ const dotClass = computed(() => {
 
 const textClass = computed(() => {
   if (stage.value) return (STAGE_STYLE[stage.value] || STAGE_STYLE.dismissed).text
-  if (props.busyHint) return 'text-slate-500'
-  return props.hintTone === 'ok' ? 'text-sky-700' : 'text-amber-700'
+  if (props.busyHint) return 'text-slate-500 dark:text-slate-400'
+  return props.hintTone === 'ok' ? 'text-sky-700 dark:text-sky-400' : 'text-amber-700 dark:text-amber-400'
 })
 
 const percent = computed(() => (props.update && props.update.percent) || 0)
 </script>
 
 <template>
-  <footer class="border-t border-slate-200 bg-white px-4 py-2">
+  <footer class="border-t border-slate-200 bg-white px-4 py-2 dark:border-slate-800 dark:bg-slate-900">
     <div
       v-if="stage === 'downloading'"
-      class="mb-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100"
+      class="mb-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
     >
       <div
         class="h-full rounded-full bg-sky-600 transition-all duration-300"

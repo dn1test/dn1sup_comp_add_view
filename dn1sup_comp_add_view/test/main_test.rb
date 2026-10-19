@@ -126,9 +126,11 @@ module CustomTools
 
       test 'панель: settings_hash содержит ключи интерфейса' do
         h = Panel.settings_hash
-        %i[angle_z angle_x make_copy side_view offset rot180 version].each do |k|
+        %i[angle_z angle_x make_copy side_view offset rot180 language theme version].each do |k|
           assert(h.key?(k), "нет ключа #{k}")
         end
+        assert(%w[ru en].include?(h[:language]), "неожидаемый язык: #{h[:language].inspect}")
+        assert(%w[light dark].include?(h[:theme]), "неожидаемая тема: #{h[:theme].inspect}")
       end
 
       test 'панель: resources/panel.html собран и содержит корень Vue' do
@@ -136,24 +138,38 @@ module CustomTools
         assert(File.file?(html), "нет собранной панели #{html}")
         content = File.read(html, encoding: 'UTF-8')
         assert(content.include?('id="app"'), 'panel.html без корня монтирования Vue (#app)')
-        assert(content.include?('Схема поворота и проекций'), 'panel.html без объединённой схемы (SchemeCombined)')
+        assert(content.include?('вид сверху (план)'), 'panel.html без схемы (SchemeCombined i18n)')
         assert(!content.include?('раскладка проекций'), 'в panel.html осталась старая раздельная схема проекций')
         assert(content.include?('update_status'), 'panel.html без канала статус-бара обновления')
-        assert(content.include?('Справка'), 'panel.html без справки (HelpDialog)')
+        assert(content.include?('Справка'), 'panel.html без справки (HelpDialog i18n)')
         assert(content.include?('preview_apply_many'), 'panel.html без preview_apply_many — устаревшая сборка (npm run build)')
         assert(content.include?('Будут выполнены'), 'panel.html без подсказки «Будут выполнены» — устаревшая сборка (npm run build)')
+        assert(content.include?('dn1sup_comp_add_view_theme'), 'panel.html без переключателя темы — устаревшая сборка (npm run build)')
+        assert(content.include?('dn1sup_comp_add_view_lang'), 'panel.html без переключателя языка — устаревшая сборка (npm run build)')
         assert(!content.include?(' Виды сверху и сбоку '),
                'в panel.html нижние галки — сборка не пересобрана после правок (npm run build)')
         assert(content.bytesize > 50_000, 'panel.html подозрительно мал — бандл не встроен')
       end
 
-      test 'настройки читаются кортежем из 6 значений' do
-        z, x, make_copy, side, offset, rot180 = Settings.get_settings
+      test 'настройки читаются кортежем из 8 значений' do
+        z, x, make_copy, side, offset, rot180, language, theme = Settings.get_settings
         assert(z.is_a?(Float) && x.is_a?(Float), 'углы должны быть Float')
         assert([true, false].include?(make_copy), 'make_copy должен быть Boolean')
         assert(%w[Справа Слева].include?(side), "неожидаемый вид сбоку: #{side.inspect}")
         assert(!offset.to_s.empty?, 'отступ пуст')
         assert([true, false].include?(rot180), 'rot180 должен быть Boolean')
+        assert(%w[ru en].include?(language), "неожидаемый язык: #{language.inspect}")
+        assert(%w[light dark].include?(theme), "неожидаемая тема: #{theme.inspect}")
+      end
+
+      test 'настройки: язык и тема нормализуются' do
+        assert_equal('en', Settings.normalize_language('en'))
+        assert_equal('en', Settings.normalize_language(' EN '))
+        assert_equal('ru', Settings.normalize_language('de'))
+        assert_equal('ru', Settings.normalize_language(nil))
+        assert_equal('dark', Settings.normalize_theme('dark'))
+        assert_equal('light', Settings.normalize_theme('светлая'))
+        assert_equal('light', Settings.normalize_theme(nil))
       end
 
       test 'calculate_gap: проценты от габарита и фиксированные мм' do
@@ -300,7 +316,7 @@ module CustomTools
         model.selection.clear
         (model.entities.to_a - before).each { |e| e.erase! if e.respond_to?(:valid?) && e.valid? }
         group.erase! if group.respond_to?(:valid?) && group.valid?
-        Settings.save_settings(*prev) if prev && prev.size == 6
+        Settings.save_settings(*prev) if prev && prev.size >= 6
       end
     end
 
@@ -333,7 +349,7 @@ module CustomTools
         model.selection.clear
         (model.entities.to_a - before).each { |e| e.erase! if e.respond_to?(:valid?) && e.valid? }
         group.erase! if group.respond_to?(:valid?) && group.valid?
-        Settings.save_settings(*prev) if prev && prev.size == 6
+        Settings.save_settings(*prev) if prev && prev.size >= 6
       end
     end
   end

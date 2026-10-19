@@ -16,6 +16,8 @@ const mockState = {
   make_copy: true,
   side_view: 'Справа',
   offset: '20%',
+  language: 'ru',
+  theme: 'light',
   selection: { total: 3, targets: 1 }
 }
 

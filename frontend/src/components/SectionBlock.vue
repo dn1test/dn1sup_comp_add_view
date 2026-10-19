@@ -3,6 +3,8 @@
 // По умолчанию в зоне действия — кнопка (buttonLabel); слотом #action её можно
 // заменить (например, галочкой выбора операции: общая кнопка «Применить» одна
 // на все блоки — см. App.vue). Параметры применяются сразу (автосохранение).
+import { t } from '../i18n/index.js'
+
 defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
@@ -15,11 +17,11 @@ defineEmits(['run'])
 </script>
 
 <template>
-  <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+  <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
     <slot name="title">
-      <h2 class="text-sm font-semibold text-slate-800">{{ title }}</h2>
+      <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ title }}</h2>
     </slot>
-    <p v-if="description" class="mt-0.5 text-xs leading-relaxed text-slate-500">{{ description }}</p>
+    <p v-if="description" class="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{{ description }}</p>
 
     <div class="mt-3">
       <slot name="params" />
@@ -34,7 +36,7 @@ defineEmits(['run'])
           :disabled="busy || disabled"
           @click="$emit('run')"
         >
-          {{ busy ? 'Выполняется…' : buttonLabel }}
+          {{ busy ? t('apply.running') : buttonLabel }}
         </button>
       </slot>
     </div>

@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { t } from '../i18n/index.js'
 
 // Единая картина раскладки: исходный объект в центре и три копии вокруг него —
 // «вид сверху» над ним (поворот X +90°, отступ по Z), «вид сбоку» справа
@@ -225,11 +226,15 @@ const allTriads = computed(() => {
   })
   return list
 })
+
+// Подпись направления вида сбоку — через i18n (внутреннее значение sideView
+// остаётся русским для совместимости с settings.yaml и Ruby)
+const sideLabel = computed(() => (props.sideView === 'Слева' ? t('scheme.sideLeft') : t('scheme.sideRight')))
 </script>
 
 <template>
   <div>
-    <svg viewBox="-14 0 274 164" class="block w-full bg-slate-50/60" role="img" aria-label="Схема поворота и проекций">
+    <svg viewBox="-14 0 274 164" class="block w-full bg-slate-50/60 dark:bg-slate-900" role="img" :aria-label="t('scheme.topPlan')">
       <defs>
         <marker id="sch-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
           <path d="M0 0 L8 4 L0 8 Z" fill="#64748b" />
@@ -245,14 +250,14 @@ const allTriads = computed(() => {
         </marker>
       </defs>
 
-      <text x="8" y="14" class="fill-slate-400" font-size="9">вид сверху (план)</text>
-      <text x="252" y="14" text-anchor="end" class="fill-slate-400" font-size="9">затем ↻ X</text>
+      <text x="8" y="14" class="fill-slate-400 dark:fill-slate-500" font-size="9">{{ t('scheme.topPlan') }}</text>
+      <text x="252" y="14" text-anchor="end" class="fill-slate-400 dark:fill-slate-500" font-size="9">{{ t('scheme.thenX') }}</text>
 
       <!-- копия «вид сверху»: над исходным объектом с вертикальным отступом -->
       <rect x="100" y="16" width="60" height="32" rx="3" fill="#fef3c7" stroke="#d97706" stroke-width="1.4" stroke-dasharray="4 3" />
-      <text x="130" y="35" text-anchor="middle" class="fill-amber-700" font-size="9">вид сверху</text>
+      <text x="130" y="35" text-anchor="middle" class="fill-amber-700 dark:fill-amber-400" font-size="9">{{ t('scheme.topView') }}</text>
       <line x1="130" y1="52" x2="130" y2="68" stroke="#64748b" stroke-width="1.2" marker-start="url(#sch-arrow)" marker-end="url(#sch-arrow)" />
-      <text x="136" y="63" class="fill-slate-500" font-size="8">{{ offsetPercent }}%</text>
+      <text x="136" y="63" class="fill-slate-500 dark:fill-slate-400" font-size="8">{{ offsetPercent }}%</text>
 
       <!-- повёрнутая копия: объёмный параллелепипед, сдвиг влево + поворот Z, наклон X -->
       <g v-if="makeCopy">
@@ -264,7 +269,7 @@ const allTriads = computed(() => {
            точка вставки — передний левый нижний угол -->
       <g>
         <rect x="106" y="80" width="48" height="48" rx="3" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" />
-        <text x="130" y="96" text-anchor="middle" class="fill-sky-800" font-size="9">исходный</text>
+        <text x="130" y="96" text-anchor="middle" class="fill-sky-800 dark:fill-sky-300" font-size="9">{{ t('scheme.source') }}</text>
       </g>
 
       <!-- «поворот на месте»: итоговая поза призраком на том же месте -->
@@ -309,29 +314,29 @@ const allTriads = computed(() => {
 
       <!-- копия «вид сбоку»: всегда справа, направление взгляда по переключателю -->
       <line x1="164" y1="103" x2="186" y2="103" stroke="#64748b" stroke-width="1.2" marker-start="url(#sch-arrow)" marker-end="url(#sch-arrow)" />
-      <text x="175" y="97" text-anchor="middle" class="fill-slate-500" font-size="8">{{ offsetPercent }}%</text>
+      <text x="175" y="97" text-anchor="middle" class="fill-slate-500 dark:fill-slate-400" font-size="8">{{ offsetPercent }}%</text>
       <rect x="190" y="78" width="50" height="50" rx="3" fill="#fef3c7" stroke="#d97706" stroke-width="1.4" stroke-dasharray="4 3" />
-      <text x="215" y="106" text-anchor="middle" class="fill-amber-700" font-size="9">вид сбоку</text>
-      <text x="215" y="118" text-anchor="middle" class="fill-amber-700/70" font-size="8">вид {{ sideView === 'Слева' ? 'слева' : 'справа' }}</text>
+      <text x="215" y="106" text-anchor="middle" class="fill-amber-700 dark:fill-amber-400" font-size="9">{{ t('scheme.sideView') }}</text>
+      <text x="215" y="118" text-anchor="middle" class="fill-amber-700/70 dark:fill-amber-400/70" font-size="8">{{ sideLabel }}</text>
 
       <!-- сдвиг копии влево: ширина объекта плюс отступ -->
       <g v-if="makeCopy">
         <line x1="100" y1="140" x2="24" y2="140" stroke="#64748b" stroke-width="1.2" marker-end="url(#sch-arrow)" />
-        <text x="62" y="152" text-anchor="middle" class="fill-slate-400" font-size="8">сдвиг на ширину + {{ offsetPercent }}%</text>
+        <text x="62" y="152" text-anchor="middle" class="fill-slate-400 dark:fill-slate-500" font-size="8">{{ t('scheme.shiftWidth', { offset: offsetPercent }) }}</text>
       </g>
     </svg>
 
     <div class="flex flex-wrap items-center gap-1.5 px-3 py-2">
-      <span class="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">Z: {{ angleZ }}°</span>
-      <span v-if="rot180" class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">+180°</span>
-      <span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700">X: {{ angleX }}°</span>
-      <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-        {{ makeCopy ? 'копия слева' : 'поворот на месте' }}
+      <span class="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">Z: {{ angleZ }}°</span>
+      <span v-if="rot180" class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">+180°</span>
+      <span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">X: {{ angleX }}°</span>
+      <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+        {{ makeCopy ? t('scheme.copyLeft') : t('scheme.inPlace') }}
       </span>
-      <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-        сбоку: вид {{ sideView === 'Слева' ? 'слева' : 'справа' }}
+      <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+        {{ t('scheme.sidePrefix', { side: sideLabel }) }}
       </span>
-      <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">отступ: {{ offsetPercent }}%</span>
+      <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ t('scheme.offsetPrefix', { offset: offsetPercent }) }}</span>
     </div>
   </div>
 </template>

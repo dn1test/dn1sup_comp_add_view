@@ -75,9 +75,9 @@ module CustomTools
         # Настройки одним хешем для панели (кортеж Settings.get_settings)
         # @return [Hash]
         def settings_hash
-          z, x, copy, side, offset, rot180 = Settings.get_settings
+          z, x, copy, side, offset, rot180, language, theme = Settings.get_settings
           { angle_z: z, angle_x: x, make_copy: copy, side_view: side, offset: offset,
-            rot180: rot180, version: VERSION }
+            rot180: rot180, language: language, theme: theme, version: VERSION }
         end
 
         # Пушит событие в панель: window.__dn1Event({type:, id:, payload:}).
@@ -198,7 +198,7 @@ module CustomTools
           data = data.transform_keys(&:to_s)
           Settings.save_settings(
             data['angle_z'], data['angle_x'], data['make_copy'], data['side_view'], data['offset'],
-            data['rot180']
+            data['rot180'], data['language'], data['theme']
           )
           settings_hash
         rescue StandardError => e

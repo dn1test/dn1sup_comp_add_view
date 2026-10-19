@@ -11,8 +11,11 @@ checks = {
   'кнопка «Применить»' => panel.include?('Применить'),
   'колбэк preview_apply_many' => panel.include?('preview_apply_many'),
   'подсказка «Будут выполнены»' => panel.include?('Будут выполнены'),
-  'схема (aria-label)' => panel.include?('Схема поворота и проекций'),
-  'справка' => panel.include?('Справка')
+  'схема (i18n-подпись «вид сверху (план)»)' => panel.include?('вид сверху (план)'),
+  'справка' => panel.include?('Справка'),
+  'переключатель темы' => panel.include?('dn1sup_comp_add_view_theme'),
+  'переключатель языка' => panel.include?('dn1sup_comp_add_view_lang'),
+  'тёмная тема (dark:)' => panel.include?('dark:bg-slate-900')
 }
 
 failed = 0

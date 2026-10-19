@@ -1,6 +1,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { Globe, Moon, Sun } from 'lucide-vue-next'
 import { callRuby, onEvent } from './bridge.js'
+import { locale, setLocale, t } from './i18n/index.js'
+import { applyTheme, isDark, toggleTheme } from './composables/useTheme.js'
 import SectionBlock from './components/SectionBlock.vue'
 import RotateParams from './components/RotateParams.vue'
 import ViewsParams from './components/ViewsParams.vue'
@@ -40,17 +43,17 @@ const hasTargets = computed(() => selection.value.targets > 0)
 const canApply = computed(() => hasTargets.value && (applyRotate.value || applyViews.value))
 const applying = computed(() => busy.apply)
 const applyHint = computed(() => {
-  if (!hasTargets.value) return 'Выделите компонент или группу'
-  if (applyRotate.value && applyViews.value) return 'Будут выполнены: поворот и виды сверху и сбоку'
-  if (applyRotate.value) return 'Будет выполнен: поворот'
-  if (applyViews.value) return 'Будут выполнены: виды сверху и сбоку'
-  return 'Отметьте хотя бы одну операцию'
+  if (!hasTargets.value) return t('apply.hintNoTargets')
+  if (applyRotate.value && applyViews.value) return t('apply.hintBoth')
+  if (applyRotate.value) return t('apply.hintRotate')
+  if (applyViews.value) return t('apply.hintViews')
+  return t('apply.hintNone')
 })
 const selectionText = computed(() => {
   const { total, targets } = selection.value
-  if (targets > 0) return `Выделено объектов: ${targets} — предпросмотр и операции доступны`
-  if (total > 0) return `Выделено: ${total}, но среди них нет компонентов или групп — выделите компонент или группу`
-  return 'Выделите компонент или группу в модели'
+  if (targets > 0) return t('selection.targets', { targets })
+  if (total > 0) return t('selection.noTargets', { total })
+  return t('selection.empty')
 })
 
 // Обновление считается идущим, пока апдейтер в активной стадии — крутится
@@ -60,7 +63,12 @@ const updateBusy = computed(() =>
 )
 
 // Подсказка выполняемой операции для статус-бара ('' — ничего не выполняется)
-const busyHint = computed(() => (busy.apply ? 'Выполняется применение…' : ''))
+const busyHint = computed(() => (busy.apply ? t('busy.applying') : ''))
+
+// Язык: кнопка показывает ЦЕЛЕВОЙ язык (как в export_pdf2 / time_project)
+const langTarget = computed(() => (locale.value === 'ru' ? 'EN' : 'RU'))
+const langTitle = computed(() => (locale.value === 'ru' ? t('lang.toEn') : t('lang.toRu')))
+const themeTitle = computed(() => (isDark.value ? t('theme.toLight') : t('theme.toDark')))
 
 function clampPercent(v) {
   const n = Number(String(v == null ? '' : v).replace(',', '.'))
@@ -87,6 +95,16 @@ function normalize(raw) {
     side_view: s.side_view === 'Слева' ? 'Слева' : 'Справа',
     offset: `${clampPercent(s.offset)}%`,
     rot180: s.rot180 === true || s.rot180 === 'true'
+  }
+}
+
+// Полный payload для settings_save: геометрия + UI-предпочтения
+// (язык/тема — источник истины settings.yaml, localStorage — кэш)
+function fullPayload() {
+  return {
+    ...normalize(settings.value),
+    language: locale.value,
+    theme: isDark.value ? 'dark' : 'light'
   }
 }
 
@@ -146,9 +164,9 @@ async function pollSelection() {
 // (ошибка — только тост), а параметры блоков обновляют живой 3D-предпросмотр
 const saveSettings = debounce(async () => {
   try {
-    await callRuby('settings_save', normalize(settings.value))
+    await callRuby('settings_save', fullPayload())
   } catch (e) {
-    showToast(`Не сохранено: ${(e && e.message) || e}`)
+    showToast(t('toast.notSaved', { message: (e && e.message) || e }))
   }
 }, 400)
 
@@ -200,6 +218,19 @@ watch(hasTargets, (v) => {
   if (!v) callRuby('preview_cancel')
 })
 
+// Смена языка/темы из шапки: применяется сразу и сохраняется в settings.yaml
+function switchLanguage() {
+  setLocale(locale.value === 'ru' ? 'en' : 'ru')
+  if (!ready) return
+  saveSettings()
+}
+
+function switchTheme() {
+  toggleTheme()
+  if (!ready) return
+  saveSettings()
+}
+
 // Общее «Применить»: отмеченные галочками операции выполняются над одним и
 // тем же выделением — Ruby (Preview.apply_many) восстанавливает выделение
 // между шагами, поэтому проекции создаются от исходного объекта, а не от
@@ -215,18 +246,18 @@ async function doApply() {
     await refreshSelection()
     // ok:false — Ruby не смог выполнить (обычно нет подходящего выделения)
     if (res && res.ok === false) {
-      showToast('Не выполнено: выделите компонент или группу')
+      showToast(t('toast.notDone'))
       return
     }
     showToast(
       kinds.length === 2
-        ? 'Поворот и проекции применены (Ctrl+Z — отмена по шагам)'
+        ? t('toast.appliedBoth')
         : kinds[0] === 'rotate'
-          ? 'Поворот применён (Ctrl+Z — отмена)'
-          : 'Проекции созданы (Ctrl+Z — отмена)'
+          ? t('toast.appliedRotate')
+          : t('toast.appliedViews')
     )
   } catch (e) {
-    showToast(`Ошибка: ${(e && e.message) || e}`)
+    showToast(t('toast.error', { message: (e && e.message) || e }))
   } finally {
     busy.apply = false
   }
@@ -247,13 +278,15 @@ onMounted(async () => {
   onEvent('update_status', (st) => {
     if (!st || typeof st !== 'object') return
     updateStatus.value = st
-    if (st.stage === 'done') showToast('Обновление установлено — перезапустите SketchUp')
+    if (st.stage === 'done') showToast(t('toast.updateDone'))
   })
   try {
     const s = await callRuby('settings_get')
     if (s && typeof s === 'object') {
       settings.value = fromRuby(s)
       if (s.version) version.value = String(s.version)
+      if (s.language) setLocale(s.language)
+      if (s.theme) applyTheme(String(s.theme).toLowerCase() === 'dark')
     }
   } catch {
     /* мост недоступен — работаем на значениях по умолчанию */
@@ -273,21 +306,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col bg-slate-50 text-slate-800">
-    <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+  <div class="flex h-full flex-col bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-200">
+    <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
       <div class="flex items-center gap-2.5 min-w-0">
         <img src="./assets/logo.svg" width="28" height="28" class="shrink-0" alt="DN1Sup Comp Add View">
         <div>
-          <h1 class="text-sm font-semibold leading-tight text-slate-800">Comp Add View</h1>
-          <p class="text-xs text-slate-500">DN1Sup · настройки применяются сразу</p>
+          <h1 class="text-sm font-semibold leading-tight text-slate-800 dark:text-slate-100">Comp Add View</h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('header.subtitle') }}</p>
         </div>
       </div>
       <div class="flex items-center gap-1.5">
         <button
           type="button"
-          title="Справка"
-          aria-label="Справка"
-          class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600"
+          :title="t('header.helpTitle')"
+          :aria-label="t('header.helpTitle')"
+          class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-sky-400"
           @click="helpOpen = true"
         >
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -298,9 +331,9 @@ onUnmounted(() => {
         </button>
         <button
           type="button"
-          title="Проверить обновление (GitHub Releases)"
-          aria-label="Проверить обновление"
-          class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600"
+          :title="t('header.checkUpdateTitle')"
+          :aria-label="t('header.checkUpdateTitle')"
+          class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-sky-400"
           @click="checkUpdate"
         >
           <svg class="h-4 w-4" :class="{ 'animate-spin': updateBusy }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -308,7 +341,27 @@ onUnmounted(() => {
             <path d="M21 3v5h-5" />
           </svg>
         </button>
-        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+        <button
+          type="button"
+          :title="themeTitle"
+          :aria-label="themeTitle"
+          class="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-sky-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-sky-400"
+          @click="switchTheme"
+        >
+          <Sun v-if="isDark" class="h-4 w-4" />
+          <Moon v-else class="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-semibold uppercase text-slate-500 transition-colors hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          :title="langTitle"
+          :aria-label="langTitle"
+          @click="switchLanguage"
+        >
+          <Globe class="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+          {{ langTarget }}
+        </button>
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           {{ version ? `v${version}` : '·' }}
         </span>
       </div>
@@ -316,7 +369,7 @@ onUnmounted(() => {
 
     <div class="flex-1 overflow-y-auto">
       <!-- Единый эскиз обеих операций: реагирует на все параметры в реальном времени -->
-      <div class="mx-4 mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div class="mx-4 mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <SchemeCombined
           :angle-z="settings.angle_z"
           :angle-x="settings.angle_x"
@@ -328,13 +381,13 @@ onUnmounted(() => {
       </div>
 
       <SectionBlock
-        title="Поворот"
-        description="Копия сдвигается влево на ширину объекта плюс отступ (или поворот на месте), затем поворот вокруг точки вставки: сначала Z (30–70°, тумблером +180°), затем X (30–70°)."
+        :title="t('section.rotate.title')"
+        :description="t('section.rotate.desc')"
       >
         <template #title>
           <label class="flex cursor-pointer items-center gap-2.5">
-            <input v-model="applyRotate" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600" />
-            <span class="text-sm font-semibold text-slate-800">Поворот</span>
+            <input v-model="applyRotate" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600 dark:border-slate-600" />
+            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ t('section.rotate.title') }}</span>
           </label>
         </template>
         <template #params>
@@ -343,13 +396,13 @@ onUnmounted(() => {
       </SectionBlock>
 
       <SectionBlock
-        title="Вид сверху и сбоку"
-        description="Копия «вид сверху» ставится над объектом, копия «вид сбоку» — справа; отступ задаётся в процентах. Переключатель выбирает направление взгляда: вид справа (Z −90°) или слева (Z +90°)."
+        :title="t('section.views.title')"
+        :description="t('section.views.desc')"
       >
         <template #title>
           <label class="flex cursor-pointer items-center gap-2.5">
-            <input v-model="applyViews" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600" />
-            <span class="text-sm font-semibold text-slate-800">Вид сверху и сбоку</span>
+            <input v-model="applyViews" type="checkbox" class="h-4 w-4 rounded border-slate-300 accent-sky-600 dark:border-slate-600" />
+            <span class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ t('section.views.title') }}</span>
           </label>
         </template>
         <template #params>
@@ -358,16 +411,16 @@ onUnmounted(() => {
       </SectionBlock>
 
       <!-- Общая кнопка применения: выполняет отмеченные галочками операции -->
-      <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <section class="mx-4 mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <button
           type="button"
           class="w-full rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-700 active:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="!canApply || applying"
           @click="doApply"
         >
-          {{ applying ? 'Выполняется…' : 'Применить' }}
+          {{ applying ? t('apply.running') : t('apply.button') }}
         </button>
-        <p class="mt-2 text-center text-xs text-slate-400">{{ applyHint }}</p>
+        <p class="mt-2 text-center text-xs text-slate-400 dark:text-slate-500">{{ applyHint }}</p>
       </section>
     </div>
 
@@ -381,7 +434,7 @@ onUnmounted(() => {
 
     <div
       v-if="toast"
-      class="pointer-events-none fixed bottom-12 left-4 right-4 rounded-lg bg-slate-800 px-3 py-2 text-center text-xs text-white shadow-lg"
+      class="pointer-events-none fixed bottom-12 left-4 right-4 rounded-lg bg-slate-800 px-3 py-2 text-center text-xs text-white shadow-lg dark:bg-slate-700"
     >
       {{ toast }}
     </div>
