@@ -123,6 +123,10 @@ module CustomTools
         assert(!content.include?('раскладка проекций'), 'в panel.html осталась старая раздельная схема проекций')
         assert(content.include?('update_status'), 'panel.html без канала статус-бара обновления')
         assert(content.include?('Справка'), 'panel.html без справки (HelpDialog)')
+        assert(content.include?('preview_apply_many'), 'panel.html без preview_apply_many — устаревшая сборка (npm run build)')
+        assert(content.include?('Будут выполнены'), 'panel.html без подсказки «Будут выполнены» — устаревшая сборка (npm run build)')
+        assert(!content.include?(' Виды сверху и сбоку '),
+               'в panel.html нижние галки — сборка не пересобрана после правок (npm run build)')
         assert(content.bytesize > 50_000, 'panel.html подозрительно мал — бандл не встроен')
       end
 
