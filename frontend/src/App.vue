@@ -211,8 +211,13 @@ async function doApply() {
   if (applyViews.value) kinds.push('views')
   busy.apply = true
   try {
-    await callRuby('preview_apply_many', { kinds, ...normalize(settings.value) })
+    const res = await callRuby('preview_apply_many', { kinds, ...normalize(settings.value) })
     await refreshSelection()
+    // ok:false — Ruby не смог выполнить (обычно нет подходящего выделения)
+    if (res && res.ok === false) {
+      showToast('Не выполнено: выделите компонент или группу')
+      return
+    }
     showToast(
       kinds.length === 2
         ? 'Поворот и проекции применены (Ctrl+Z — отмена по шагам)'

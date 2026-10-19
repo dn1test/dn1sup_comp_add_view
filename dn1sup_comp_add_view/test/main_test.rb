@@ -60,6 +60,23 @@ module CustomTools
         assert(Panel.respond_to?(:settings_hash), 'нет Panel.settings_hash')
         assert(Panel.respond_to?(:push_selection), 'нет Panel.push_selection')
         assert(Panel.respond_to?(:record_update_status), 'нет Panel.record_update_status')
+        assert(Panel.respond_to?(:parse_panel_payload), 'нет Panel.parse_panel_payload')
+      end
+
+      # Регрессия v0.13.0: колбэк «Применить» проверял params.is_a?(Hash), а
+      # панель присылает JSON-строку — kinds терялись и кнопка молча ничего
+      # не делала. Разбор payload обязан понимать строку, Hash и мусор.
+      test 'панель: payload панели разбирается из JSON-строки' do
+        json = JSON.generate('kinds' => %w[rotate views], 'offset' => '20%')
+        data = Panel.parse_panel_payload(json)
+        assert(data.is_a?(Hash), 'JSON-строка панели должна разбираться в Hash')
+        assert_equal(%w[rotate views], Array(data['kinds']), 'kinds потеряны при разборе payload панели')
+
+        assert_equal({ 'a' => 1 }, Panel.parse_panel_payload('{"a":1}'))
+        assert_equal({}, Panel.parse_panel_payload('битая { json'), 'битая строка должна давать пустой хеш')
+        assert_equal({}, Panel.parse_panel_payload(nil))
+        assert_equal({}, Panel.parse_panel_payload(42))
+        assert_equal({ 'kinds' => ['rotate'] }, Panel.parse_panel_payload('kinds' => ['rotate']))
       end
 
       # Статус-бар: record_update_status запоминает стадию апдейтера —
@@ -277,6 +294,39 @@ module CustomTools
         }
         assert(Preview.apply_many(%w[rotate views], params),
                'apply_many не отработал на выделенной группе')
+        new_items = model.entities.to_a - before
+        assert(new_items.size >= 3, "ожидали копию поворота и две проекции, создано: #{new_items.size}")
+      ensure
+        model.selection.clear
+        (model.entities.to_a - before).each { |e| e.erase! if e.respond_to?(:valid?) && e.valid? }
+        group.erase! if group.respond_to?(:valid?) && group.valid?
+        Settings.save_settings(*prev) if prev && prev.size == 6
+      end
+    end
+
+    # Регрессия v0.13.0 сквозным путём: панель шлёт kinds внутри JSON-строки —
+    # воспроизводим ровно то, что делает колбэк preview_apply_many с её
+    # payload. До фикса kinds терялись, apply_many получал [] и молча
+    # возвращал false при показанном «успехе».
+    test 'apply_many: панельный путь (JSON-строка) создаёт копию и проекции' do
+      skip('вне SketchUp: нет активной модели') unless defined?(Sketchup) && Sketchup.active_model
+
+      model = Sketchup.active_model
+      group = model.entities.add_group
+      face = group.entities.add_face([0, 0, 0], [100.mm, 0, 0], [100.mm, 50.mm, 0], [0, 50.mm, 0])
+      face.pushpull(20.mm)
+      # apply_many пишет параметры в настройки, поэтому возвращаем прежние
+      prev = Settings.get_settings
+      before = model.entities.to_a
+      begin
+        payload = JSON.generate(
+          'kinds' => %w[rotate views], 'angle_z' => 30, 'angle_x' => 0,
+          'make_copy' => true, 'side_view' => 'Справа', 'offset' => '20%', 'rot180' => false
+        )
+        model.selection.add(group)
+        data = Panel.parse_panel_payload(payload) # как в колбэке preview_apply_many
+        assert(Preview.apply_many(Array(data['kinds']), data),
+               'apply_many не отработал с панельным payload — «Применить» молча бездействует')
         new_items = model.entities.to_a - before
         assert(new_items.size >= 3, "ожидали копию поворота и две проекции, создано: #{new_items.size}")
       ensure

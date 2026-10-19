@@ -101,6 +101,15 @@ module CustomTools
           push_event('selection', payload: selection_info)
         end
 
+        # Payload панели: HtmlDialog присылает JSON-строку (Hash бывает в
+        # тестах и прямых вызовах); битая строка и не-Hash дают пустой хеш —
+        # колбэки не должны падать или молча терять данные на мусорном входе
+        # @return [Hash{String => Object}]
+        def parse_panel_payload(params)
+          data = params.is_a?(String) ? (JSON.parse(params) rescue nil) : params
+          data.is_a?(Hash) ? data : {}
+        end
+
         # Стадии проверки/установки обновления (status_cb апдейтера, вызывается
         # на главном потоке): статус запоминается даже при закрытой панели —
         # переоткрытая панель покажет последнее состояние, а открытой уходит
@@ -150,12 +159,14 @@ module CustomTools
           }
           # Комбинированное «Применить»: подмножество операций (галочки панели)
           # над одним и тем же выделением — apply_many восстанавливает выделение
-          # между шагами
+          # между шагами. kinds извлекаются из разобранного payload (панель шлёт
+          # JSON-строку), ok сообщает панели о неудаче — нет подходящего выделения
           dlg.add_action_callback('preview_apply_many') { |_ctx, req_id, params|
-            kinds = params.is_a?(Hash) ? Array(params['kinds']) : []
-            Preview.apply_many(kinds, params)
+            data = parse_panel_payload(params)
+            kinds = Array(data['kinds'])
+            ok = Preview.apply_many(kinds, data)
             push_selection
-            push_event('result', id: req_id, payload: { action: 'many', kinds: kinds })
+            push_event('result', id: req_id, payload: { action: 'many', kinds: kinds, ok: ok })
           }
           dlg.add_action_callback('preview_cancel') { |_ctx, _req_id| Preview.cancel }
           dlg.add_action_callback('open_releases') { UI.openURL(PAGE_URL) }
@@ -183,8 +194,7 @@ module CustomTools
         # Сохранение настроек из параметров панели (Hash со строковыми ключами
         # или JSON-строка); возвращает свежий хеш настроек
         def save_from_panel(params)
-          data = params.is_a?(String) ? JSON.parse(params) : params
-          data = {} unless data.is_a?(Hash)
+          data = parse_panel_payload(params).transform_keys(&:to_s)
           data = data.transform_keys(&:to_s)
           Settings.save_settings(
             data['angle_z'], data['angle_x'], data['make_copy'], data['side_view'], data['offset'],

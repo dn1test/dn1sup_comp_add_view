@@ -117,9 +117,11 @@ function mockCall(action, payload) {
     case 'preview_views_update':
       return { preview: mockState.selection.targets > 0 }
     case 'preview_apply':
-      return { action: 'rotate' }
+      return { action: 'rotate', ok: mockState.selection.targets > 0 }
     case 'preview_views_apply':
-      return { action: 'views' }
+      return { action: 'views', ok: mockState.selection.targets > 0 }
+    case 'preview_apply_many':
+      return { action: 'many', kinds: (payload && payload.kinds) || [], ok: mockState.selection.targets > 0 }
     case 'preview_cancel':
       return null
     case 'check_update': {
