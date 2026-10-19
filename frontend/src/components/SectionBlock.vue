@@ -23,7 +23,7 @@ defineEmits(['run'])
       <slot name="params" />
     </div>
 
-    <div class="mt-3">
+    <div v-if="buttonLabel || $slots.action" class="mt-3">
       <slot name="action">
         <button
           v-if="buttonLabel"
