@@ -2,7 +2,7 @@
 // Плоские ключи "секция.имя"; {param} — интерполяция в t(key, params).
 
 export const ru = {
-  'header.subtitle': 'DN1Sup · настройки применяются сразу',
+  'header.subtitle': 'Добавление видов компонента с разных сторон',
   'header.helpTitle': 'Справка',
   'header.checkUpdateTitle': 'Проверить обновление (GitHub Releases)',
 

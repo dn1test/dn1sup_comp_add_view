@@ -1,7 +1,7 @@
 // English panel dictionary. Keys mirror ru.js (the fallback dictionary).
 
 export const en = {
-  'header.subtitle': 'DN1Sup · settings apply instantly',
+  'header.subtitle': 'Adding component views from different sides',
   'header.helpTitle': 'Help',
   'header.checkUpdateTitle': 'Check for updates (GitHub Releases)',
 
