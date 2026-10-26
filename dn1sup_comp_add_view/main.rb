@@ -21,7 +21,7 @@ end
 
 module CustomTools
   module ComponentAddViews
-    VERSION  = '0.14.1'.freeze
+    VERSION  = '0.14.2'.freeze
 
     ID       = 'dn1sup_comp_add_view'.freeze
     REPO     = 'dn1test/dn1sup_comp_add_view'.freeze
@@ -46,10 +46,10 @@ module CustomTools
         @update_timer_id = nil
       end
       Panel.close_all if defined?(Panel) && Panel.respond_to?(:close_all)
-      # Прячем только реально созданную панель: конструирование UI::Toolbar
-      # для несуществующей регистрирует её в списке панелей SketchUp.
-      if defined?(UI) && Sketchup.respond_to?(:read_default) &&
-         Sketchup.read_default('DN1Sup ExtManager', 'shared_toolbar_show_individual')
+      # Тулбар всегда отдельный: прячем реально созданную панель.
+      # UI::Toolbar.new для несуществующей регистрирует её в списке
+      # панелей SketchUp (фантом), поэтому hide — только по visible?.
+      if defined?(UI)
         toolbar = UI::Toolbar.new('DN1Sup Comp Add View')
         toolbar.hide if toolbar.respond_to?(:visible?) && toolbar.visible?
       end
@@ -90,20 +90,15 @@ module CustomTools
       end
       menu.add_item('Страница релизов на GitHub') { UI.openURL(CustomTools::ComponentAddViews::PAGE_URL) }
 
-      # Панель инструментов — одна кнопка открытия панели. Не создаём её,
-      # пока включена общая панель DN1Sup (параметр «Показывать отдельные
-      # тулбары расширений» выключен): тогда тулбара нет и в списке панелей
-      # SketchUp; состав общей панели настраивается в менеджере.
-      if Sketchup.respond_to?(:read_default) &&
-         Sketchup.read_default('DN1Sup ExtManager', 'shared_toolbar_show_individual')
-        toolbar = UI::Toolbar.new('DN1Sup Comp Add View')
-        toolbar.add_item(cmd_panel)
+      # Панель инструментов — одна кнопка открытия панели. Тулбар всегда
+      # отдельный: общая панель DN1Sup больше не используется.
+      toolbar = UI::Toolbar.new('DN1Sup Comp Add View')
+      toolbar.add_item(cmd_panel)
 
-        if toolbar.get_last_state == -1
-          toolbar.show
-        else
-          toolbar.restore
-        end
+      if toolbar.get_last_state == -1
+        toolbar.show
+      else
+        toolbar.restore
       end
 
       # Фоновая проверка обновлений один раз за сессию (не раньше 15 секунд,
