@@ -46,9 +46,9 @@ module CustomTools
         @update_timer_id = nil
       end
       Panel.close_all if defined?(Panel) && Panel.respond_to?(:close_all)
-      # Тулбар всегда отдельный: прячем реально созданную панель.
-      # UI::Toolbar.new для несуществующей регистрирует её в списке
-      # панелей SketchUp (фантом), поэтому hide — только по visible?.
+      # Прячем реально созданную панель: UI::Toolbar.new для несуществующей
+      # регистрирует её в списке панелей SketchUp (фантом),
+      # поэтому hide — только по visible?.
       if defined?(UI)
         toolbar = UI::Toolbar.new('DN1Sup Comp Add View')
         toolbar.hide if toolbar.respond_to?(:visible?) && toolbar.visible?
@@ -90,8 +90,7 @@ module CustomTools
       end
       menu.add_item('Страница релизов на GitHub') { UI.openURL(CustomTools::ComponentAddViews::PAGE_URL) }
 
-      # Панель инструментов — одна кнопка открытия панели. Тулбар всегда
-      # отдельный: общая панель DN1Sup больше не используется.
+      # Панель инструментов — одна кнопка открытия панели.
       toolbar = UI::Toolbar.new('DN1Sup Comp Add View')
       toolbar.add_item(cmd_panel)
 
